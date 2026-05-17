@@ -2,11 +2,6 @@
 
 local Lighting = game:GetService("Lighting")
 
-for _, v in pairs(Lighting:GetChildren()) do
-	if v:IsA("Sky") then
-		v:Destroy()
-	end
-end
 
 if not isfolder("hk") then makefolder("hk") end
 
