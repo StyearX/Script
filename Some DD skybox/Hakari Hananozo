@@ -25,9 +25,11 @@ Sky.CelestialBodiesShown = false
 Sky.StarCount = 0
 
 for _, v in ipairs(faces) do
-	local data = game:HttpGet(v.url, true)
-	writefile("hk/" .. v.file, data)
-	Sky[v.prop] = getcustomasset("hk/" .. v.file)
+	local path = "hk/" .. v.file
+	if not isfile(path) then
+		writefile(path, game:HttpGet(v.url, true))
+	end
+	Sky[v.prop] = getcustomasset(path)
 end
 
 Sky.Parent = Lighting
