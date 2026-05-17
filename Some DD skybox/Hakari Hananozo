@@ -1,6 +1,33 @@
-https://od.lk/d/NjNfOTg0NjEzMTZf/Skydn.tex
-https://od.lk/s/NjNfOTg0NjEzMTdf/SkyFt.tex
-https://od.lk/s/NjNfOTg0NjEzMThf/SkyIf.tex
-https://od.lk/d/NjNfOTg0NjEzMTlf/SkyRt.tex
-https://od.lk/d/NjNfOTg0NjEzMjBf/SkyUp.tex
-https://od.lk/d/NjNfOTg0NjEzMTVf/SkyBk.tex
+-- skybox made by xThonyG
+
+local Lighting = game:GetService("Lighting")
+
+for _, v in pairs(Lighting:GetChildren()) do
+	if v:IsA("Sky") then
+		v:Destroy()
+	end
+end
+
+if not isfolder("hk") then makefolder("hk") end
+
+local faces = {
+	{prop = "SkyboxBk", url = "https://od.lk/d/NjNfOTg0NjEzMTVf/SkyBk.tex", file = "SkyBk.png"},
+	{prop = "SkyboxFt", url = "https://od.lk/s/NjNfOTg0NjEzMTdf/SkyFt.tex", file = "SkyFt.png"},
+	{prop = "SkyboxLf", url = "https://od.lk/s/NjNfOTg0NjEzMThf/SkyIf.tex", file = "SkyIf.png"},
+	{prop = "SkyboxRt", url = "https://od.lk/d/NjNfOTg0NjEzMTlf/SkyRt.tex", file = "SkyRt.png"},
+	{prop = "SkyboxUp", url = "https://od.lk/d/NjNfOTg0NjEzMjBf/SkyUp.tex", file = "SkyUp.png"},
+	{prop = "SkyboxDn", url = "https://od.lk/d/NjNfOTg0NjEzMTZf/Skydn.tex", file = "Skydn.png"},
+}
+
+local Sky = Instance.new("Sky")
+Sky.Name = "Sky"
+Sky.CelestialBodiesShown = false
+Sky.StarCount = 0
+
+for _, v in ipairs(faces) do
+	local data = game:HttpGet(v.url, true)
+	writefile("hk/" .. v.file, data)
+	Sky[v.prop] = getcustomasset("hk/" .. v.file)
+end
+
+Sky.Parent = Lighting
