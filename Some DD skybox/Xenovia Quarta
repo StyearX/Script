@@ -1,0 +1,35 @@
+-- skybox made by xThonyG
+
+local Lighting = game:GetService("Lighting")
+
+for _, v in pairs(Lighting:GetChildren()) do
+	if v:IsA("Sky") then
+		v:Destroy()
+	end
+end
+
+if not isfolder("Xenovia Quarta") then makefolder("Xenovia Quarta") end
+
+local faces = {
+	{prop = "SkyboxLf", url = "https://od.lk/d/NjNfOTg0NjM0ODhf/if.png", file = "if.png"},
+	{prop = "SkyboxBk", url = "https://od.lk/d/NjNfOTg0NjM0ODlf/ft.png", file = "ft.png"},
+	{prop = "SkyboxDn", url = "https://od.lk/d/NjNfOTg0NjM0OTBf/dn.png", file = "dn.png"},
+	{prop = "SkyboxFt", url = "https://od.lk/d/NjNfOTg0NjM0OTFf/bk.png", file = "bk.png"},
+	{prop = "SkyboxUp", url = "https://od.lk/d/NjNfOTg0NjM0ODZf/up.png", file = "up.png"},
+	{prop = "SkyboxRt", url = "https://od.lk/d/NjNfOTg0NjM0ODdf/rt.png", file = "rt.png"},
+}
+
+local Sky = Instance.new("Sky")
+Sky.Name = "Sky"
+Sky.CelestialBodiesShown = false
+Sky.StarCount = 0
+
+for _, v in ipairs(faces) do
+	local path = "Xenovia Quarta/" .. v.file
+	if not isfile(path) then
+		writefile(path, game:HttpGet(v.url, true))
+	end
+	Sky[v.prop] = getcustomasset(path)
+end
+
+Sky.Parent = Lighting
