@@ -1,0 +1,41 @@
+-- skybox made by xThonyG
+
+local Lighting = game:GetService("Lighting")
+
+for _, v in pairs(Lighting:GetChildren()) do
+	if v:IsA("Sky") then
+		v:Destroy()
+	end
+end
+
+for _, v in pairs(Lighting:GetChildren()) do
+	if v:IsA("Atmosphere") then
+		v.Haze = 0
+	end
+end
+
+if not isfolder("Alya") then makefolder("Alya") end
+
+local faces = {
+	{prop = "SkyboxRt", url = "https://od.lk/d/NjNfOTg0NzkzMTZf/Rt.png", file = "Rt.png"},
+	{prop = "SkyboxUp", url = "https://od.lk/d/NjNfOTg0NzkzMTVf/Up.png", file = "Up.png"},
+	{prop = "SkyboxDn", url = "https://od.lk/d/NjNfOTg0NzkzMTJf/dn.png", file = "dn.png"},
+	{prop = "SkyboxFt", url = "https://od.lk/d/NjNfOTg0NzkzMTNf/ft.png", file = "ft.png"},
+	{prop = "SkyboxBk", url = "https://od.lk/d/NjNfOTg0NzkzMTFf/bk.png", file = "bk.png"},
+	{prop = "SkyboxLf", url = "https://od.lk/d/NjNfOTg0NzkzMTRf/if.png", file = "if.png"},
+}
+
+local Sky = Instance.new("Sky")
+Sky.Name = "Sky"
+Sky.CelestialBodiesShown = false
+Sky.StarCount = 0
+
+for _, v in ipairs(faces) do
+	local path = "Alya/" .. v.file
+	if not isfile(path) then
+		writefile(path, game:HttpGet(v.url, true))
+	end
+	Sky[v.prop] = getcustomasset(path)
+end
+
+Sky.Parent = Lighting
