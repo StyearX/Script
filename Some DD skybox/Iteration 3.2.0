@@ -1,0 +1,22 @@
+local Lighting = game:GetService('Lighting')
+
+for _, v in pairs(Lighting:GetChildren()) do
+  if v:IsA('Sky') then
+    v:Destroy()
+  end
+end
+
+local Sky = Instance.new('Sky')
+Sky.Name = 'Sky'
+
+Sky.SkyboxFt = 'rbxassetid://105535126430905'
+Sky.SkyboxBk = 'rbxassetid://101641214159376'
+Sky.SkyboxLf = 'rbxassetid://127042338628927'
+Sky.SkyboxRt = 'rbxassetid://129888290742886'
+Sky.SkyboxDn = 'rbxassetid://70926232246739'
+Sky.SkyboxUp = 'rbxassetid://92868008160444'
+
+Sky.CelestialBodiesShown = false
+Sky.StarCount = 0
+
+Sky.Parent = Lighting
