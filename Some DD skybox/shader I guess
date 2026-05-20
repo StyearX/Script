@@ -1,0 +1,97 @@
+local Lighting  = game:GetService('Lighting')
+local Players   = game:GetService('Players')
+
+for _, v in pairs(Lighting:GetChildren()) do
+	if v:IsA("Sky") then
+		v:Destroy()
+	end
+end
+
+for _, v in pairs(Lighting:GetChildren()) do
+	if v:IsA("Atmosphere") then
+		v.Haze = 0
+	end
+end
+
+if not isfolder("Nino Nakano") then makefolder("Nino Nakano") end
+
+local faces = {
+	{prop = "SkyboxRt", url = "https://od.lk/d/NjNfOTg0NjQyODNf/right1.png", file = "right1.png"},
+	{prop = "SkyboxLf", url = "https://od.lk/d/NjNfOTg0NjQyNzhf/back.png", file = "back.png"},
+	{prop = "SkyboxFt", url = "https://od.lk/d/NjNfOTg0NjQyODBf/front.png", file = "front.png"},
+	{prop = "SkyboxBk", url = "https://od.lk/d/NjNfOTg0NjQyODJf/left1.png", file = "left1.png"},
+	{prop = "SkyboxDn", url = "https://od.lk/d/NjNfOTg0NjQyNzlf/down.png", file = "downnino.png"},
+	{prop = "SkyboxUp", url = "https://od.lk/d/NjNfOTg0NjQyODFf/up.png", file = "upnino.png"},
+}
+
+local Sky = Instance.new("Sky")
+Sky.CelestialBodiesShown = true
+Sky.StarCount = 3000
+Sky.SunAngularSize = 0
+Sky.MoonAngularSize = 0
+Sky.Parent = Lighting
+
+for _, v in ipairs(faces) do
+	local path = "Nino Nakano/" .. v.file
+	if not isfile(path) then
+		writefile(path, game:HttpGet(v.url, true))
+	end
+	Sky[v.prop] = getcustomasset(path)
+end
+
+for _, v in pairs(Lighting:GetChildren()) do
+    if v:IsA('Atmosphere') or v:IsA('ColorCorrectionEffect')
+    or v:IsA('BloomEffect') or v:IsA('DepthOfFieldEffect')
+    or v:IsA('SunRaysEffect') then
+        v:Destroy()
+    end
+end
+
+local Atmo = Instance.new('Atmosphere')
+Atmo.Density    = 0.18
+Atmo.Offset     = 0.45
+Atmo.Color      = Color3.fromRGB(160, 148, 120)
+Atmo.Decay      = Color3.fromRGB(20, 18, 14)
+Atmo.Glare      = 0.06
+Atmo.Haze       = 0
+Atmo.Parent     = Lighting
+
+local CC = Instance.new('ColorCorrectionEffect')
+CC.Brightness   = -0.06
+CC.Contrast     = 0.18
+CC.Saturation   = -0.25
+CC.TintColor    = Color3.fromRGB(200, 198, 210)
+CC.Parent       = Lighting
+
+local Bloom = Instance.new('BloomEffect')
+Bloom.Intensity  = 0.6
+Bloom.Size       = 32
+Bloom.Threshold  = 0.9
+Bloom.Parent     = Lighting
+
+local SunRays = Instance.new('SunRaysEffect')
+SunRays.Intensity = 0.08
+SunRays.Spread    = 0.5
+SunRays.Parent    = Lighting
+
+local DOF = Instance.new('DepthOfFieldEffect')
+DOF.FarIntensity    = 0.4
+DOF.FocusDistance   = 50
+DOF.InFocusRadius   = 30
+DOF.NearIntensity   = 0
+DOF.Parent          = Lighting
+
+local function applyReflectance(root)
+    for _, v in ipairs(root:GetDescendants()) do
+        if v:IsA('BasePart') then
+            v.Reflectance = 0.35
+        end
+    end
+end
+
+applyReflectance(workspace)
+workspace.DescendantAdded:Connect(function(v)
+    if v:IsA('BasePart') then
+        v.Reflectance = 0.35
+    end
+end)
