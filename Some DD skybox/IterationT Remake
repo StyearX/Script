@@ -1,0 +1,23 @@
+local Lighting = game:GetService("Lighting")
+
+local oldSky = Lighting:FindFirstChildOfClass("Sky")
+if oldSky then
+	oldSky:Destroy()
+end
+
+local Sky = Instance.new("Sky")
+Sky.Name = "IterationT"
+
+Sky.SkyboxLf = "rbxassetid://131895067742893"
+Sky.SkyboxFt = "rbxassetid://139394863985793"
+Sky.SkyboxRt = "rbxassetid://93313124175539"
+Sky.SkyboxBk = "rbxassetid://93271230842735"
+Sky.SkyboxDn = "rbxassetid://72142305760362"
+Sky.SkyboxUp = "rbxassetid://86656757951125"
+
+Sky.CelestialBodiesShown = false
+Sky.StarCount = 3000
+Sky.SunAngularSize = 0
+Sky.MoonAngularSize = 0
+
+Sky.Parent = Lighting
