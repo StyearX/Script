@@ -2575,7 +2575,10 @@ MakeBottomButton("Resume", "Resume Game", "rbxasset://textures/ui/Settings/Help/
 	SetVisibility(false)
 end, BottomButtonSize)
 
+local NativeHideInProgress = false
+
 local HideNativeSettingsMenu = function()
+	NativeHideInProgress = true
 	local RobloxGui = CoreGui:FindFirstChild("RobloxGui")
 	local Shield = RobloxGui and RobloxGui:FindFirstChild("SettingsClippingShield")
 	if Shield then
@@ -2594,6 +2597,9 @@ local HideNativeSettingsMenu = function()
 			HideGuiObject(Child)
 		end
 	end
+	task.defer(function()
+		NativeHideInProgress = false
+	end)
 end
 
 local InputLockAction = "Settings2016InputLock"
@@ -2849,62 +2855,73 @@ end)
 
 local HookNativeMenu = function()
 	local HookedNative = {}
-	local GetNativeMenuTarget = function()
-		if Hub.NativeMenuTarget == nil then
-			return true
-		end
-		return Hub.NativeMenuTarget
-	end
+	local NativeShieldRef = nil
+	local LastNativeShowTime = 0
+
 	local NativeMenuOpened = function()
+		if NativeHideInProgress then return end
+		if tick() < Hub.SuppressNativeOpenUntil then
+			HideNativeSettingsMenu()
+			return
+		end
+		local Now = tick()
+		if (Now - LastNativeShowTime) < 0.3 then return end
+		LastNativeShowTime = Now
 		HideNativeSettingsMenu()
-		if tick() < Hub.SuppressNativeOpenUntil then return end
-		SetVisibility(GetNativeMenuTarget())
-		Hub.NativeMenuTarget = nil
+		if not Hub.Visible then
+			SetVisibility(true)
+		end
 	end
+
 	local HookNativeObject = function(Object)
 		if not Object or HookedNative[Object] or not Object:IsA("GuiObject") then return end
 		HookedNative[Object] = true
 		Connect(Object:GetPropertyChangedSignal("Visible"), function()
-			if Object.Visible then NativeMenuOpened() end
+			if NativeHideInProgress then return end
+			if Object.Visible then
+				NativeMenuOpened()
+			end
 		end)
-		if Object.Visible then NativeMenuOpened() end
 	end
+
 	local RobloxGui = CoreGui:FindFirstChild("RobloxGui")
 	local Shield = RobloxGui and RobloxGui:FindFirstChild("SettingsClippingShield")
+
 	local HookNativeContainer = function(NewShield)
 		if not NewShield then return end
-		Shield = NewShield
+		NativeShieldRef = NewShield
 		HideNativeSettingsMenu()
+		HookedNative[NewShield] = true
+		Connect(NewShield:GetPropertyChangedSignal("Visible"), function()
+			if NativeHideInProgress then return end
+			if NewShield.Visible then
+				NativeMenuOpened()
+			end
+		end)
 		for _, Object in next, NewShield:GetDescendants() do
 			HookNativeObject(Object)
 		end
 	end
+
 	HookNativeContainer(Shield)
+
 	if RobloxGui then
 		Connect(RobloxGui.DescendantAdded, function(Descendant)
 			if Descendant.Name == "SettingsClippingShield" and Descendant.Parent == RobloxGui then
 				HookNativeContainer(Descendant)
-			elseif Shield and Descendant:IsDescendantOf(Shield) then
+			elseif NativeShieldRef and Descendant:IsDescendantOf(NativeShieldRef) then
 				HookNativeObject(Descendant)
-				if Descendant:IsA("GuiObject") and Descendant.Visible then NativeMenuOpened() end
 			end
 		end)
 	end
+
 	local TopBarApp = CoreGui:FindFirstChild("TopBarApp")
 	TopBarApp = TopBarApp and TopBarApp:FindFirstChild("TopBarApp")
 	local Holder = TopBarApp and TopBarApp:FindFirstChild("MenuIconHolder")
 	local Hit = Holder and Holder:FindFirstChild("TriggerPoint") and Holder.TriggerPoint:FindFirstChild("IconHitArea")
 	if Hit and Hit:IsA("GuiButton") then
 		Connect(Hit.MouseButton1Click, function()
-			local Target = not Hub.Visible
-			Hub.NativeMenuTarget = Target
-			Spawn(function()
-				Wait()
-				SetVisibility(Target)
-				if Hub.NativeMenuTarget == Target then
-					Hub.NativeMenuTarget = nil
-				end
-			end)
+			SetVisibility(not Hub.Visible)
 		end)
 	end
 end
