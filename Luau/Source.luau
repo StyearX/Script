@@ -1,18 +1,14 @@
--- lmao making ui code not ugly is hard without a ui framework
--- i tried to make this as readable as i could
 -- github.com/lxte
 
 if (not game:IsLoaded()) then
 	game.Loaded:Wait()
 end
 
--- Services
 local InsertService = game:GetService("InsertService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
--- UI
 local PlayerGui = Players.LocalPlayer.PlayerGui
 local Parent = (function()
 	local Success, Result = pcall(function()
@@ -26,7 +22,6 @@ local Parent = (function()
 	return Result
 end)()
 
--- Functions
 local SetProperty = function(Object: Instance, Property: string, Value: any)
 	if (Value == nil) then
 		return
@@ -63,7 +58,6 @@ local MultiTween = function(Info: { [string]: any }, Properties: { [Instance]: {
 	end
 end
 
--- Types
 export type Configuration = {
 	Title: string,
 	Description: string?,
@@ -79,12 +73,10 @@ export type EditOptions = {
 	VerticalPosition: "Top" | "Bottom" | nil,
 	HorizontalPosition: "Left" | "Right" | nil,	
 
-	-- this shouldnt be updated
 	UI: typeof(script.Parent),
 	Order: number,
 }
 
--- Init
 local Notification = ({})
 Notification.__index = Notification
 type Self = typeof(Notification)
@@ -114,7 +106,6 @@ end
 Notification.Create = function(self: typeof(Notification:New()), Configuration: Configuration)
 	self.Order -= 1
 
-	-- Setup
 	local UI = self.UI
 	local Sizer = UI.Template:Clone()
 	local Notification = Sizer.Notification
@@ -141,7 +132,6 @@ Notification.Create = function(self: typeof(Notification:New()), Configuration: 
 	local Destroyed = false
 	local OriginalSize = Notification.AbsoluteSize
 
-	-- Functions
 	local Animate = function(Shown: boolean)
 		local Size = UDim2.fromOffset(OriginalSize.X, OriginalSize.Y)
 		local NotificationPosition = (function()
@@ -174,7 +164,6 @@ Notification.Create = function(self: typeof(Notification:New()), Configuration: 
 		end
 	end
 
-	-- Rest
 	Notification.AutomaticSize = Enum.AutomaticSize.None
 	MultiTween({ 0, Enum.EasingStyle.Quint }, Animate(false)) task.wait()
 	MultiTween({ 0.75, Enum.EasingStyle.Quint }, Animate(true))
