@@ -197,7 +197,6 @@ local function ActivateNativeTab(activeNative)
 	for _, btn in next, CustomTabButtons do SetTabAppearance(btn, false) end
 	for _, nt in next, NativeTabs do
 		local isActive = nt == activeNative
-		local sel = nt:FindFirstChild("TabSelection"); if sel then sel.Visible = isActive end
 		local tl = nt:FindFirstChild("TabLabel")
 		if tl then
 			local ti = tl:FindFirstChild("Title"); if ti then Tween(ti, 0.15, { TextTransparency = isActive and TAB_ACTIVE_TRANS or TAB_INACTIVE_TRANS }) end
@@ -209,32 +208,55 @@ local function ActivateNativeTab(activeNative)
 		end
 	end
 end
-AddConn(MenuContainer:GetPropertyChangedSignal("Visible"):Connect(function()
-	if MenuContainer.Visible then
-		task.defer(function()
-			CurrentActiveTabType = "native"
-			CurrentActiveTabName = nil
-			for _, pg in next, CustomTabPages do pcall(function() pg.Visible = false; pg.Position = UDim2.new(2,0,0,0) end) end
-			for _, btn in next, CustomTabButtons do SetTabAppearance(btn, false) end
-			ShowNativePages()
-			if #NativeTabs > 0 then
-				ActivateNativeTab(NativeTabs[1])
+
+local function SyncFromNativeSelection()
+	CurrentActiveTabType = "native"; CurrentActiveTabName = nil
+	for _, pg in next, CustomTabPages do pcall(function() pg.Visible = false; pg.Position = UDim2.new(2,0,0,0) end) end
+	for _, btn in next, CustomTabButtons do SetTabAppearance(btn, false) end
+	ShowNativePages()
+end
+
+local NativeTabWatchers = {}
+local function WatchNativeTab(nt)
+	if NativeTabWatchers[nt] then return end
+	local sel = nt:FindFirstChild("TabSelection")
+	if sel then
+		NativeTabWatchers[nt] = AddConn(sel:GetPropertyChangedSignal("Visible"):Connect(function()
+			if sel.Visible then
+				SyncFromNativeSelection()
 			end
-		end)
+		end))
 	else
+		local c = AddConn(nt.ChildAdded:Connect(function(child)
+			if child.Name == "TabSelection" and not NativeTabWatchers[nt] then
+				NativeTabWatchers[nt] = AddConn(child:GetPropertyChangedSignal("Visible"):Connect(function()
+					if child.Visible then SyncFromNativeSelection() end
+				end))
+			end
+		end))
+	end
+end
+
+AddConn(MenuContainer:GetPropertyChangedSignal("Visible"):Connect(function()
+	if not MenuContainer.Visible then
 		for _, pg in next, CustomTabPages do pcall(function() pg.Visible = false end) end
+		CurrentActiveTabType = "native"
+		CurrentActiveTabName = nil
+		for _, btn in next, CustomTabButtons do SetTabAppearance(btn, false) end
 	end
 end))
 AddConn(TabScroller.ChildAdded:Connect(function(c)
 	if c:IsA("TextButton") and not CustomTabButtons[c.Name] then
 		table.insert(NativeTabs, c); c.LayoutOrder = #NativeTabs
 		AddConn(c.MouseButton1Click:Connect(function() ActivateNativeTab(c) end))
+		WatchNativeTab(c)
 	end
 end))
 for _, child in next, TabScroller:GetChildren() do
 	if child:IsA("TextButton") then
 		table.insert(NativeTabs, child); child.LayoutOrder = #NativeTabs
 		AddConn(child.MouseButton1Click:Connect(function() ActivateNativeTab(child) end))
+		WatchNativeTab(child)
 	end
 end
 SetTabAppearance = function(btn, active)
@@ -264,7 +286,11 @@ AddConn(PageInner.ChildAdded:Connect(function(child)
 		end
 	end
 end))
-task.defer(function() RefreshNativePagesList(); if #NativeTabs > 0 then ActivateNativeTab(NativeTabs[1]) end end)
+task.defer(function()
+	RefreshNativePagesList()
+	for _, nt in next, NativeTabs do WatchNativeTab(nt) end
+	if #NativeTabs > 0 then ActivateNativeTab(NativeTabs[1]) end
+end)
 
 local function RebuildTabSizes()
 	for _, nt in next, NativeTabs do nt.Size = UDim2.new(0, 120, 1, 0); nt.AutomaticSize = Enum.AutomaticSize.None end
@@ -805,6 +831,209 @@ local function MakeInput(page, name, placeholder, defaultText, changed)
 	return api
 end
 
+local function MakeDropdownPanel()
+	local overlay = New("TextButton", {
+		Parent = OverlayRoot,
+		Name = "CoreUiDropdownOverlay",
+		Visible = false,
+		BackgroundColor3 = Color3.new(0,0,0),
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		Text = "",
+		Size = UDim2.new(1,0,1,0),
+		ZIndex = 20,
+	})
+	local panel = New("Frame", {
+		Parent = overlay,
+		BackgroundColor3 = Color3.fromRGB(22,22,22),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		Size = UDim2.new(0,420,0,0),
+		Position = UDim2.new(0.5,-210,0.5,0),
+		ZIndex = 21,
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, {
+		New("UICorner", { CornerRadius = UDim.new(0,10) }),
+		New("UIStroke", { Color = Color3.fromRGB(255,255,255), Transparency = 0.82, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	local list = New("ScrollingFrame", {
+		Parent = panel,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1,0,0,0),
+		Position = UDim2.new(0,0,0,0),
+		CanvasSize = UDim2.new(0,0,0,0),
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = Color3.fromRGB(180,180,180),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ZIndex = 22,
+		ClipsDescendants = true,
+	})
+	local listLayout = New("UIListLayout", {
+		Parent = list,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		FillDirection = Enum.FillDirection.Vertical,
+		Padding = UDim.new(0,0),
+	})
+	local listPad = New("UIPadding", {
+		Parent = list,
+		PaddingLeft = UDim.new(0,8),
+		PaddingRight = UDim.new(0,8),
+		PaddingTop = UDim.new(0,8),
+		PaddingBottom = UDim.new(0,8),
+	})
+	local MAX_H = 320
+	list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		local h = math.min(list.AbsoluteContentSize.Y + 16, MAX_H)
+		list.Size = UDim2.new(1, 0, 0, h)
+	end)
+	return overlay, panel, list
+end
+
+local function MakeArrowIcon(parent)
+	local iconAsset = ResolveIconAsset("lucide/chevron-down")
+	local arrow
+	if iconAsset then
+		arrow = New("ImageLabel", {
+			Parent = parent,
+			BackgroundTransparency = 1,
+			Image = iconAsset,
+			ImageColor3 = Color3.fromRGB(200,200,200),
+			Size = UDim2.new(0,18,0,18),
+			Position = UDim2.new(1,-30,0.5,-9),
+			ZIndex = 8,
+		})
+	else
+		arrow = New("TextLabel", {
+			Parent = parent,
+			BackgroundTransparency = 1,
+			Text = "v",
+			Font = Enum.Font.BuilderSansMedium,
+			TextSize = 16,
+			TextColor3 = Color3.fromRGB(200,200,200),
+			Size = UDim2.new(0,18,0,18),
+			Position = UDim2.new(1,-30,0.5,-9),
+			ZIndex = 8,
+		})
+	end
+	return arrow
+end
+
+local function MakeDropDownSingle(page, name, options, defaultValue, changed)
+	local optionLabels = {}
+	local optionValues = {}
+	local selectedIndex = 1
+	for i, opt in ipairs(options) do
+		optionLabels[i] = opt.Label
+		optionValues[i] = opt.Value
+		if opt.Value == defaultValue then selectedIndex = i end
+	end
+
+	local displayText = optionLabels[selectedIndex] or "Select..."
+	local row = MakeRow(page, name)
+	local btn, lbl = MakeStyledButton(name.."DropDown", displayText, UDim2.new(0,300,0,44))
+	btn.Parent = row
+	btn.Position = UDim2.new(1,-350,0.5,-22)
+	local arrow = MakeArrowIcon(btn)
+
+	local overlay, panel, list = MakeDropdownPanel()
+	overlay.Name = name.."SingleDropOverlay"
+
+	local function closePanel()
+		overlay.Visible = false
+	end
+
+	local function buildList()
+		for _, c in next, list:GetChildren() do
+			if c:IsA("TextButton") or c:IsA("Frame") then c:Destroy() end
+		end
+		for i, opt in ipairs(options) do
+			local isActive = (i == selectedIndex)
+			local optRow = New("TextButton", {
+				Parent = list,
+				Name = "Opt"..i,
+				BackgroundColor3 = isActive and Color3.fromRGB(50,50,50) or Color3.fromRGB(30,30,30),
+				BackgroundTransparency = isActive and 0 or 1,
+				BorderSizePixel = 0,
+				AutoButtonColor = false,
+				Size = UDim2.new(1,0,0,46),
+				Text = "",
+				ZIndex = 23,
+				LayoutOrder = i,
+			}, { New("UICorner", { CornerRadius = UDim.new(0,6) }) })
+			New("TextLabel", {
+				Parent = optRow,
+				BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium,
+				TextSize = 22,
+				TextColor3 = isActive and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = opt.Label,
+				Size = UDim2.new(1,-16,1,0),
+				Position = UDim2.new(0,12,0,0),
+				ZIndex = 24,
+			})
+			if isActive then
+				local checkAsset = ResolveIconAsset("lucide/check")
+				if checkAsset then
+					New("ImageLabel", {
+						Parent = optRow,
+						BackgroundTransparency = 1,
+						Image = checkAsset,
+						ImageColor3 = Color3.fromRGB(255,255,255),
+						Size = UDim2.new(0,18,0,18),
+						Position = UDim2.new(1,-30,0.5,-9),
+						ZIndex = 24,
+					})
+				end
+			end
+			AddConn(optRow.MouseEnter:Connect(function()
+				if not isActive then Tween(optRow, 0.1, { BackgroundTransparency = 0.5 }) end
+			end))
+			AddConn(optRow.MouseLeave:Connect(function()
+				if not isActive then Tween(optRow, 0.1, { BackgroundTransparency = 1 }) end
+			end))
+			AddConn(optRow.MouseButton1Click:Connect(function()
+				selectedIndex = i
+				lbl.Text = opt.Label
+				if changed then changed(opt.Value) end
+				closePanel()
+				buildList()
+			end))
+		end
+	end
+	buildList()
+
+	local api = { Interactable = true, DropDownFrame = btn }
+	AddConn(btn.MouseButton1Click:Connect(function()
+		if not api.Interactable then return end
+		overlay.Visible = true
+	end))
+	AddConn(overlay.MouseButton1Click:Connect(closePanel))
+
+	function api:GetSelectedValue() return optionValues[selectedIndex] end
+	function api:SetSelectedValue(val)
+		for i, v in ipairs(optionValues) do
+			if v == val then
+				selectedIndex = i
+				lbl.Text = optionLabels[i]
+				buildList()
+				break
+			end
+		end
+	end
+	function api:SetInteractable(interactable)
+		api.Interactable = interactable
+		Tween(btn, 0.15, { BackgroundTransparency = interactable and 0.35 or 0.65 })
+		if lbl then lbl.TextTransparency = interactable and 0 or 0.5 end
+		if arrow then
+			if arrow:IsA("ImageLabel") then arrow.ImageTransparency = interactable and 0 or 0.5
+			elseif arrow:IsA("TextLabel") then arrow.TextTransparency = interactable and 0 or 0.5 end
+		end
+	end
+	return api
+end
+
 local function MakeDropDownMulti(page, name, options, defaultValues, changed)
 	local selected = {}
 	local optionLabels = {}
@@ -812,113 +1041,100 @@ local function MakeDropDownMulti(page, name, options, defaultValues, changed)
 	for i, opt in ipairs(options) do
 		optionLabels[i] = opt.Label
 		optionValues[i] = opt.Value
-		if defaultValues and table.find(defaultValues, opt.Value) then
-			selected[i] = true
-		else
-			selected[i] = false
-		end
+		selected[i] = defaultValues and table.find(defaultValues, opt.Value) ~= nil or false
 	end
 
-	local displayText = ""
-	local count = 0
-	for i, v in pairs(selected) do if v then count = count + 1 end end
-	if count == 0 then displayText = "Select..."
-	elseif count == 1 then
-		for i, v in pairs(selected) do if v then displayText = optionLabels[i]; break end end
-	else
-		displayText = count .. " selected"
+	local function getDisplayText()
+		local count = 0
+		local lastName
+		for i, v in pairs(selected) do if v then count = count + 1; lastName = optionLabels[i] end end
+		if count == 0 then return "Select..."
+		elseif count == 1 then return lastName
+		else return count .. " selected" end
 	end
 
 	local row = MakeRow(page, name)
-	local btn, lbl = MakeStyledButton(name.."DropDown", displayText, UDim2.new(0,300,0,44))
+	local btn, lbl = MakeStyledButton(name.."DropDown", getDisplayText(), UDim2.new(0,300,0,44))
 	btn.Parent = row
 	btn.Position = UDim2.new(1,-350,0.5,-22)
-	local arrow = New("ImageLabel", {
-		Parent = btn,
-		BackgroundTransparency = 1,
-		Image = "rbxasset://textures/ui/Settings/DropDown/DropDown.png",
-		Size = UDim2.new(0,15,0,10),
-		Position = UDim2.new(1,-40,0.5,-7),
-		ZIndex = 8,
-	})
-	local api = { Interactable = true, Selected = selected, DropDownFrame = btn }
-	local overlay = New("TextButton", {
-		Parent = OverlayRoot,
-		Name = name.."DropDownFullscreenFrame",
-		Visible = false,
-		BackgroundColor3 = Color3.new(0,0,0),
-		BackgroundTransparency = 0.2,
-		BorderSizePixel = 0,
-		Text = "",
-		Size = UDim2.new(1,0,1,0),
-		ZIndex = 20,
-	})
-	local panel = New("ImageLabel", {
-		Parent = overlay,
-		Image = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuButton.png",
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(8,6,46,44),
-		BackgroundTransparency = 1,
-		ImageColor3 = Color3.fromRGB(20,20,20),
-		ImageTransparency = 0.2,
-		Size = UDim2.new(0,400,0.9,0),
-		Position = UDim2.new(0.5,-200,0.05,0),
-		ZIndex = 21,
-	})
-	local list = New("ScrollingFrame", {
-		Parent = panel,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Size = UDim2.new(1,-20,1,-25),
-		Position = UDim2.new(0,10,0,10),
-		CanvasSize = UDim2.new(0,0,0,#options*51),
-		ScrollBarThickness = 6,
-		ZIndex = 21,
-	})
+	local arrow = MakeArrowIcon(btn)
+
+	local overlay, panel, list = MakeDropdownPanel()
+	overlay.Name = name.."MultiDropOverlay"
+
+	local checkIconAsset = ResolveIconAsset("lucide/check-square")
+	local uncheckIconAsset = ResolveIconAsset("lucide/square")
+
+	local function closePanel()
+		overlay.Visible = false
+	end
 
 	local function rebuild()
-		for _, child in next, list:GetChildren() do if child:IsA("TextButton") then child:Destroy() end end
+		for _, c in next, list:GetChildren() do
+			if c:IsA("TextButton") then c:Destroy() end
+		end
 		for i, opt in ipairs(options) do
 			local isSelected = selected[i] or false
-			local optBtn = New("TextButton", {
+			local optRow = New("TextButton", {
 				Parent = list,
-				Name = "Option"..i,
+				Name = "Opt"..i,
+				BackgroundColor3 = Color3.fromRGB(35,35,35),
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				AutoButtonColor = false,
-				Size = UDim2.new(1,-28,0,50),
-				Position = UDim2.new(0,14,0,(i-1)*51),
-				TextColor3 = Color3.new(1,1,1),
+				Size = UDim2.new(1,0,0,46),
+				Text = "",
+				ZIndex = 23,
+				LayoutOrder = i,
+			}, { New("UICorner", { CornerRadius = UDim.new(0,6) }) })
+			if checkIconAsset and uncheckIconAsset then
+				New("ImageLabel", {
+					Parent = optRow,
+					Name = "CheckIcon",
+					BackgroundTransparency = 1,
+					Image = isSelected and checkIconAsset or uncheckIconAsset,
+					ImageColor3 = isSelected and Color3.fromRGB(255,255,255) or Color3.fromRGB(130,130,130),
+					Size = UDim2.new(0,20,0,20),
+					Position = UDim2.new(0,10,0.5,-10),
+					ZIndex = 24,
+				})
+			end
+			New("TextLabel", {
+				Parent = optRow,
+				BackgroundTransparency = 1,
 				Font = Enum.Font.BuilderSansMedium,
-				TextSize = 24,
-				Text = (isSelected and "✓ " or "") .. opt.Label,
+				TextSize = 22,
+				TextColor3 = isSelected and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200),
 				TextXAlignment = Enum.TextXAlignment.Left,
-				ZIndex = 22,
+				Text = opt.Label,
+				Size = UDim2.new(1,-50,1,0),
+				Position = UDim2.new(0, (checkIconAsset and uncheckIconAsset) and 38 or 12, 0, 0),
+				ZIndex = 24,
 			})
-			AddConn(optBtn.MouseButton1Click:Connect(function()
+			AddConn(optRow.MouseEnter:Connect(function()
+				Tween(optRow, 0.1, { BackgroundTransparency = 0.6 })
+			end))
+			AddConn(optRow.MouseLeave:Connect(function()
+				Tween(optRow, 0.1, { BackgroundTransparency = 1 })
+			end))
+			AddConn(optRow.MouseButton1Click:Connect(function()
 				selected[i] = not selected[i]
+				lbl.Text = getDisplayText()
 				local values = {}
 				for idx, sel in pairs(selected) do if sel then table.insert(values, optionValues[idx]) end end
 				if changed then changed(values) end
-				local count2 = 0
-				for _, v in pairs(selected) do if v then count2 = count2 + 1 end end
-				if count2 == 0 then lbl.Text = "Select..."
-				elseif count2 == 1 then
-					for idx, sel in pairs(selected) do if sel then lbl.Text = optionLabels[idx]; break end end
-				else
-					lbl.Text = count2 .. " selected"
-				end
 				rebuild()
 			end))
 		end
-		list.CanvasSize = UDim2.new(0,0,0,#options*51)
 	end
 	rebuild()
 
+	local api = { Interactable = true, Selected = selected, DropDownFrame = btn }
 	AddConn(btn.MouseButton1Click:Connect(function()
-		if api.Interactable then overlay.Visible = true end
+		if not api.Interactable then return end
+		overlay.Visible = true
 	end))
-	AddConn(overlay.MouseButton1Click:Connect(function() overlay.Visible = false end))
+	AddConn(overlay.MouseButton1Click:Connect(closePanel))
 
 	function api:GetSelectedValues()
 		local values = {}
@@ -929,24 +1145,18 @@ local function MakeDropDownMulti(page, name, options, defaultValues, changed)
 		for i, v in ipairs(optionValues) do
 			selected[i] = table.find(values, v) ~= nil
 		end
-		local count2 = 0
-		for _, v in pairs(selected) do if v then count2 = count2 + 1 end end
-		if count2 == 0 then lbl.Text = "Select..."
-		elseif count2 == 1 then
-			for idx, sel in pairs(selected) do if sel then lbl.Text = optionLabels[idx]; break end end
-		else
-			lbl.Text = count2 .. " selected"
-		end
+		lbl.Text = getDisplayText()
 		rebuild()
 		if changed then changed(self:GetSelectedValues()) end
 	end
 	function api:SetInteractable(interactable)
 		api.Interactable = interactable
-		btn.ImageTransparency = interactable and 0 or 0.65
-		btn.Active = interactable
-		btn.Selectable = interactable
-		if lbl then lbl.TextTransparency = interactable and 0 or 0.65 end
-		if arrow then arrow.ImageTransparency = interactable and 0 or 0.65 end
+		Tween(btn, 0.15, { BackgroundTransparency = interactable and 0.35 or 0.65 })
+		if lbl then lbl.TextTransparency = interactable and 0 or 0.5 end
+		if arrow then
+			if arrow:IsA("ImageLabel") then arrow.ImageTransparency = interactable and 0 or 0.5
+			elseif arrow:IsA("TextLabel") then arrow.TextTransparency = interactable and 0 or 0.5 end
+		end
 	end
 	return api
 end
@@ -1151,63 +1361,30 @@ function CoreUi:Tab(section, config)
 		local multi = config.Multi or false
 		local callback = config.Callback or function() end
 
+		local row = MakeRow(self, title)
+		if desc and desc ~= "" then
+			New("TextLabel", {
+				Parent = row,
+				BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium,
+				TextSize = 18,
+				TextColor3 = Color3.fromRGB(150,150,150),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = desc,
+				Size = UDim2.new(1,-20,0,24),
+				Position = UDim2.new(0,10,0.6,0),
+				ZIndex = 6,
+			})
+			row.Size = UDim2.new(1,0,0,70)
+		end
+
 		if multi then
 			local defaultValues = {}
-			if type(default) == "table" then defaultValues = default else defaultValues = { default } end
-			local row = MakeRow(self, title)
-			if desc and desc ~= "" then
-				New("TextLabel", {
-					Parent = row,
-					BackgroundTransparency = 1,
-					Font = Enum.Font.BuilderSansMedium,
-					TextSize = 18,
-					TextColor3 = Color3.fromRGB(150,150,150),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					Text = desc,
-					Size = UDim2.new(1,-20,0,24),
-					Position = UDim2.new(0,10,0.6,0),
-					ZIndex = 6,
-				})
-				row.Size = UDim2.new(1,0,0,70)
-			end
+			if type(default) == "table" then defaultValues = default elseif default ~= nil then defaultValues = { default } end
 			local dropdown = MakeDropDownMulti(self, title.."_dropdown", options, defaultValues, callback)
 			return dropdown
 		else
-			local optLabels = {}
-			local optValues = {}
-			local defaultIndex = 1
-			for i, opt in ipairs(options) do
-				table.insert(optLabels, opt.Label)
-				table.insert(optValues, opt.Value)
-				if opt.Value == default then defaultIndex = i end
-			end
-			if #optLabels == 0 then return end
-
-			local row = MakeRow(self, title)
-			if desc and desc ~= "" then
-				New("TextLabel", {
-					Parent = row,
-					BackgroundTransparency = 1,
-					Font = Enum.Font.BuilderSansMedium,
-					TextSize = 18,
-					TextColor3 = Color3.fromRGB(150,150,150),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					Text = desc,
-					Size = UDim2.new(1,-20,0,24),
-					Position = UDim2.new(0,10,0.6,0),
-					ZIndex = 6,
-				})
-				row.Size = UDim2.new(1,0,0,70)
-			end
-
-			local dropdown = MakeDropDownMulti(self, title.."_dropdown", options, { default }, function(values)
-				callback(values[1])
-			end)
-			dropdown.SetSelectedValues = function(self, vals)
-				local valsTable = {}
-				if type(vals) == "table" then valsTable = vals else valsTable = { vals } end
-				MakeDropDownMulti.SetSelectedValues(self, valsTable)
-			end
+			local dropdown = MakeDropDownSingle(self, title.."_dropdown", options, default, callback)
 			return dropdown
 		end
 	end
