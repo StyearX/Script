@@ -486,8 +486,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 	local holder = New("Frame", {
 		Parent = row,
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0,502,0,50),
-		Position = UDim2.new(1,-502,0.5,-25),
+		Size = UDim2.new(0, 502, 0, 50),
+		Position = UDim2.new(1, -502, 0.5, -25),
 		Active = true,
 		ZIndex = 6,
 	})
@@ -495,32 +495,32 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Parent = holder,
 		BackgroundTransparency = 1,
 		Image = "",
-		Size = UDim2.new(0,60,0,50),
-		Position = UDim2.new(0,-10,0.5,-25),
+		Size = UDim2.new(0, 60, 0, 50),
+		Position = UDim2.new(0, -10, 0.5, -25),
 		ZIndex = 7,
 	})
 	New("ImageLabel", {
 		Parent = left,
 		BackgroundTransparency = 1,
-		Image = "rbxasset://textures/ui/Settings/Slider/Left.png",
-		Size = UDim2.new(0,18,0,30),
-		Position = UDim2.new(1,-24,0.5,-15),
+		Image = "rbxasset://textures/ui/Settings/Slider/Less.png",
+		Size = UDim2.new(0, 18, 0, 30),
+		Position = UDim2.new(1, -24, 0.5, -15),
 		ZIndex = 8,
 	})
 	local right = New("ImageButton", {
 		Parent = holder,
 		BackgroundTransparency = 1,
 		Image = "",
-		Size = UDim2.new(0,50,0,50),
-		Position = UDim2.new(1,-50,0.5,-25),
+		Size = UDim2.new(0, 50, 0, 50),
+		Position = UDim2.new(1, -50, 0.5, -25),
 		ZIndex = 7,
 	})
 	New("ImageLabel", {
 		Parent = right,
 		BackgroundTransparency = 1,
-		Image = "rbxasset://textures/ui/Settings/Slider/Right.png",
-		Size = UDim2.new(0,18,0,30),
-		Position = UDim2.new(0,6,0.5,-15),
+		Image = "rbxasset://textures/ui/Settings/Slider/More.png",
+		Size = UDim2.new(0, 18, 0, 30),
+		Position = UDim2.new(0, 6, 0.5, -15),
 		ZIndex = 8,
 	})
 	local segments = {}
@@ -530,13 +530,11 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 	local function refresh(immediate)
 		for i, seg in next, segments do
 			local selected = sliderApi.Interactable and i <= currentIndex
-			local color = selected and Color3.new(1,1,1) or Color3.fromRGB(80,80,80)
-			if i == 1 or i == steps then
-				seg.Image = selected and ((i == 1 and "rbxasset://textures/ui/Settings/Slider/SelectedBarLeft.png") or "rbxasset://textures/ui/Settings/Slider/SelectedBarRight.png") or ((i == 1 and "rbxasset://textures/ui/Settings/Slider/BarLeft.png") or "rbxasset://textures/ui/Settings/Slider/BarRight.png")
-				seg.ImageTransparency = 0.36
-				seg.BackgroundTransparency = 1
+			local color = selected and Color3.new(1, 1, 1) or Color3.fromRGB(80, 80, 80)
+			if immediate then
+				seg.BackgroundColor3 = color
 			else
-				if immediate then seg.BackgroundColor3 = color else Tween(seg, 0.1, { BackgroundColor3 = color }) end
+				Tween(seg, 0.1, { BackgroundColor3 = color })
 			end
 		end
 		left.Visible = sliderApi.Interactable and currentIndex > minStep
@@ -569,21 +567,15 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 	for i = 1, steps do
 		local seg = New("ImageButton", {
 			Parent = holder,
-			BackgroundColor3 = Color3.fromRGB(15,15,15),
+			BackgroundColor3 = Color3.fromRGB(80, 80, 80),
 			BackgroundTransparency = 0.36,
 			BorderSizePixel = 0,
 			AutoButtonColor = false,
 			Image = "",
-			ImageTransparency = 0.36,
-			Size = UDim2.new(0,35,0,25),
-			Position = UDim2.new(0,60+((i-1)*39),0.5,-12),
+			Size = UDim2.new(0, 35, 0, 25),
+			Position = UDim2.new(0, 60 + ((i - 1) * 39), 0.5, -12),
 			ZIndex = 7,
 		})
-		if i == 1 or i == steps then
-			seg.BackgroundTransparency = 1
-			seg.ScaleType = Enum.ScaleType.Slice
-			seg.SliceCenter = Rect.new(3,3,32,21)
-		end
 		segments[i] = seg
 		AddConn(seg.MouseButton1Click:Connect(function() if sliderApi.Interactable then setSliderValue(i) end end))
 	end
@@ -595,8 +587,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Text = "",
 		AutoButtonColor = false,
 		Active = true,
-		Size = UDim2.new(0,400,1,0),
-		Position = UDim2.new(0,52,0,0),
+		Size = UDim2.new(0, 400, 1, 0),
+		Position = UDim2.new(0, 52, 0, 0),
 		ZIndex = 9,
 	})
 	AddConn(capture.InputBegan:Connect(function(input)
@@ -634,7 +626,9 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		holder.Active = interactable
 		holder.ZIndex = interactable and 6 or 5
 		for _, seg in next, segments do
-			seg.Active = interactable; seg.Selectable = interactable; seg.ZIndex = interactable and 7 or 5
+			seg.Active = interactable
+			seg.Selectable = interactable
+			seg.ZIndex = interactable and 7 or 5
 		end
 		refresh(true)
 	end
