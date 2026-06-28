@@ -313,41 +313,46 @@ end
 local function MakeStyledButton(name, text, size, clicked)
 	local button = New("ImageButton", {
 		Name = name,
-		Image = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuButton.png",
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(8,6,46,44),
-		ImageColor3 = Color3.fromRGB(10,10,10),
-		ImageTransparency = 0.35,
+		BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
 		AutoButtonColor = false,
-		BackgroundTransparency = 1,
 		Size = size,
 		ZIndex = 6,
+	}, {
+		New("UICorner", { CornerRadius = UDim.new(0, 6) }),
+		New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.72, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
 	})
 	local label = New("TextLabel", {
-		Name = name.."TextLabel",
+		Name = name .. "TextLabel",
 		Parent = button,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Size = UDim2.new(1,0,1,-8),
-		Position = UDim2.new(0,0,0,0),
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
 		Font = Enum.Font.BuilderSansMedium,
-		TextSize = 24,
-		TextColor3 = Color3.new(1,1,1),
+		TextSize = 22,
+		TextColor3 = Color3.fromRGB(230, 230, 230),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextYAlignment = Enum.TextYAlignment.Center,
 		Text = text,
 		TextWrapped = true,
 		ZIndex = 7,
 	})
+	local stroke = button:FindFirstChildOfClass("UIStroke")
 	AddConn(button.MouseEnter:Connect(function()
-		button.Image = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuButtonSelected.png"
-		button.ImageColor3 = Color3.fromRGB(10,10,10)
-		button.ImageTransparency = 0.2
+		Tween(button, 0.12, { BackgroundTransparency = 0.15 })
+		if stroke then Tween(stroke, 0.12, { Transparency = 0.5 }) end
 	end))
 	AddConn(button.MouseLeave:Connect(function()
-		button.Image = "rbxasset://textures/ui/Settings/MenuBarAssets/MenuButton.png"
-		button.ImageColor3 = Color3.fromRGB(10,10,10)
-		button.ImageTransparency = 0.35
+		Tween(button, 0.12, { BackgroundTransparency = 0.35 })
+		if stroke then Tween(stroke, 0.12, { Transparency = 0.72 }) end
+	end))
+	AddConn(button.MouseButton1Down:Connect(function()
+		Tween(button, 0.07, { BackgroundTransparency = 0.05 })
+	end))
+	AddConn(button.MouseButton1Up:Connect(function()
+		Tween(button, 0.1, { BackgroundTransparency = 0.15 })
 	end))
 	if clicked then AddConn(button.MouseButton1Click:Connect(clicked)) end
 	return button, label
@@ -503,10 +508,10 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Parent = left,
 		BackgroundTransparency = 1,
 		Image = "rbxasset://textures/ui/Settings/Slider/Less.png",
-		Size = UDim2.new(0, 18, 0, 30),
-		Position = UDim2.new(1, -24, 0.5, -15),
+		Size = UDim2.new(0, 22, 0, 22),
+		Position = UDim2.new(0.5, -11, 0.5, -11),
 		ZIndex = 8,
-	})
+	}, { New("UIAspectRatioConstraint", { AspectRatio = 1 }) })
 	local right = New("ImageButton", {
 		Parent = holder,
 		BackgroundTransparency = 1,
@@ -519,10 +524,10 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Parent = right,
 		BackgroundTransparency = 1,
 		Image = "rbxasset://textures/ui/Settings/Slider/More.png",
-		Size = UDim2.new(0, 18, 0, 30),
-		Position = UDim2.new(0, 6, 0.5, -15),
+		Size = UDim2.new(0, 22, 0, 22),
+		Position = UDim2.new(0.5, -11, 0.5, -11),
 		ZIndex = 8,
-	})
+	}, { New("UIAspectRatioConstraint", { AspectRatio = 1 }) })
 	local segments = {}
 	local dragging = false
 	local sliderApi = { Interactable = true }
@@ -633,6 +638,135 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		refresh(true)
 	end
 	return sliderApi
+end
+
+local function MakeKeybind(page, name, defaultKey, changed)
+	local currentKey = defaultKey or Enum.KeyCode.Unknown
+	local listening = false
+	local listenConn
+	local row = MakeRow(page, name)
+	local btn = New("ImageButton", {
+		Parent = row,
+		BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Size = UDim2.new(0, 160, 0, 40),
+		Position = UDim2.new(1, -350, 0.5, -20),
+		ZIndex = 6,
+	}, {
+		New("UICorner", { CornerRadius = UDim.new(0, 6) }),
+		New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.72, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	local keyLabel = New("TextLabel", {
+		Parent = btn,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+		Font = Enum.Font.BuilderSansMedium,
+		TextSize = 20,
+		TextColor3 = Color3.fromRGB(210, 210, 210),
+		Text = currentKey.Name,
+		ZIndex = 7,
+	})
+	local stroke = btn:FindFirstChildOfClass("UIStroke")
+	local api = { Interactable = true, CurrentKey = currentKey }
+	local function stopListening()
+		listening = false
+		if listenConn then listenConn:Disconnect(); listenConn = nil end
+		if stroke then Tween(stroke, 0.15, { Transparency = 0.72, Color = Color3.fromRGB(255, 255, 255) }) end
+		Tween(btn, 0.15, { BackgroundTransparency = 0.35 })
+		keyLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+		keyLabel.Text = api.CurrentKey.Name
+	end
+	AddConn(btn.MouseButton1Click:Connect(function()
+		if not api.Interactable then return end
+		if listening then stopListening(); return end
+		listening = true
+		keyLabel.Text = "Press key..."
+		keyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		if stroke then Tween(stroke, 0.15, { Transparency = 0.3, Color = Color3.fromRGB(200, 200, 200) }) end
+		Tween(btn, 0.15, { BackgroundTransparency = 0.1 })
+		listenConn = UserInputService.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.Keyboard then
+				if input.KeyCode == Enum.KeyCode.Escape then
+					stopListening()
+				else
+					api.CurrentKey = input.KeyCode
+					if changed then changed(input.KeyCode) end
+					stopListening()
+				end
+			end
+		end)
+	end))
+	AddConn(btn.MouseEnter:Connect(function()
+		if not listening then Tween(btn, 0.12, { BackgroundTransparency = 0.15 }) end
+	end))
+	AddConn(btn.MouseLeave:Connect(function()
+		if not listening then Tween(btn, 0.12, { BackgroundTransparency = 0.35 }) end
+	end))
+	function api:SetKey(key)
+		api.CurrentKey = key
+		if not listening then keyLabel.Text = key.Name end
+	end
+	function api:SetInteractable(interactable)
+		api.Interactable = interactable
+		if not interactable and listening then stopListening() end
+		Tween(btn, 0.15, { BackgroundTransparency = interactable and 0.35 or 0.65 })
+		keyLabel.TextTransparency = interactable and 0 or 0.5
+	end
+	return api
+end
+
+local function MakeInput(page, name, placeholder, defaultText, changed)
+	local row = MakeRow(page, name)
+	local frame = New("Frame", {
+		Parent = row,
+		BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		Size = UDim2.new(0, 300, 0, 40),
+		Position = UDim2.new(1, -350, 0.5, -20),
+		ZIndex = 6,
+	}, {
+		New("UICorner", { CornerRadius = UDim.new(0, 6) }),
+		New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.72, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	local textbox = New("TextBox", {
+		Parent = frame,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, -16, 1, 0),
+		Position = UDim2.new(0, 8, 0, 0),
+		Font = Enum.Font.BuilderSansMedium,
+		TextSize = 20,
+		TextColor3 = Color3.fromRGB(220, 220, 220),
+		PlaceholderColor3 = Color3.fromRGB(110, 110, 110),
+		PlaceholderText = placeholder or "Enter text...",
+		Text = defaultText or "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ClearTextOnFocus = false,
+		ZIndex = 7,
+	})
+	local stroke = frame:FindFirstChildOfClass("UIStroke")
+	AddConn(textbox.Focused:Connect(function()
+		if stroke then Tween(stroke, 0.15, { Transparency = 0.35 }) end
+		Tween(frame, 0.15, { BackgroundTransparency = 0.2 })
+	end))
+	AddConn(textbox.FocusLost:Connect(function(enterPressed)
+		if stroke then Tween(stroke, 0.15, { Transparency = 0.72 }) end
+		Tween(frame, 0.15, { BackgroundTransparency = 0.35 })
+		if changed then changed(textbox.Text, enterPressed) end
+	end))
+	local api = { Interactable = true, TextBox = textbox }
+	function api:GetText() return textbox.Text end
+	function api:SetText(t) textbox.Text = t or "" end
+	function api:SetInteractable(interactable)
+		api.Interactable = interactable
+		textbox.TextEditable = interactable
+		Tween(frame, 0.15, { BackgroundTransparency = interactable and 0.35 or 0.65 })
+		textbox.TextTransparency = interactable and 0 or 0.5
+	end
+	return api
 end
 
 local function MakeDropDownMulti(page, name, options, defaultValues, changed)
@@ -996,7 +1130,6 @@ function CoreUi:Tab(section, config)
 		local desc = config.Description or ""
 		local text = config.Text or "Click"
 		local callback = config.Callback or function() end
-
 		local row = MakeRow(self, title)
 		if desc and desc ~= "" then
 			New("TextLabel", {
@@ -1004,20 +1137,72 @@ function CoreUi:Tab(section, config)
 				BackgroundTransparency = 1,
 				Font = Enum.Font.BuilderSansMedium,
 				TextSize = 18,
-				TextColor3 = Color3.fromRGB(150,150,150),
+				TextColor3 = Color3.fromRGB(150, 150, 150),
 				TextXAlignment = Enum.TextXAlignment.Left,
 				Text = desc,
-				Size = UDim2.new(1,-20,0,24),
-				Position = UDim2.new(0,10,0.6,0),
+				Size = UDim2.new(1, -20, 0, 24),
+				Position = UDim2.new(0, 10, 0.6, 0),
 				ZIndex = 6,
 			})
-			row.Size = UDim2.new(1,0,0,70)
+			row.Size = UDim2.new(1, 0, 0, 70)
 		end
-
-		local btn, lbl = MakeStyledButton(title.."Button", text, UDim2.new(0,200,0,44), callback)
+		local btn, lbl = MakeStyledButton(title .. "Button", text, UDim2.new(0, 220, 0, 42), callback)
 		btn.Parent = row
-		btn.Position = UDim2.new(1,-350,0.5,-22)
+		btn.Position = UDim2.new(1, -350, 0.5, -21)
 		return btn, lbl
+	end
+
+	function tab:AddKeybind(config)
+		config = config or {}
+		local title = config.Title or "Keybind"
+		local desc = config.Description or ""
+		local default = config.Default or Enum.KeyCode.Unknown
+		local callback = config.Callback or function() end
+		local row = MakeRow(self, title)
+		if desc and desc ~= "" then
+			New("TextLabel", {
+				Parent = row,
+				BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium,
+				TextSize = 18,
+				TextColor3 = Color3.fromRGB(150, 150, 150),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = desc,
+				Size = UDim2.new(1, -20, 0, 24),
+				Position = UDim2.new(0, 10, 0.6, 0),
+				ZIndex = 6,
+			})
+			row.Size = UDim2.new(1, 0, 0, 70)
+		end
+		local keybind = MakeKeybind(self, title .. "_keybind", default, callback)
+		return keybind
+	end
+
+	function tab:AddInput(config)
+		config = config or {}
+		local title = config.Title or "Input"
+		local desc = config.Description or ""
+		local placeholder = config.Placeholder or "Enter text..."
+		local default = config.Default or ""
+		local callback = config.Callback or function() end
+		local row = MakeRow(self, title)
+		if desc and desc ~= "" then
+			New("TextLabel", {
+				Parent = row,
+				BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium,
+				TextSize = 18,
+				TextColor3 = Color3.fromRGB(150, 150, 150),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = desc,
+				Size = UDim2.new(1, -20, 0, 24),
+				Position = UDim2.new(0, 10, 0.6, 0),
+				ZIndex = 6,
+			})
+			row.Size = UDim2.new(1, 0, 0, 70)
+		end
+		local input = MakeInput(self, title .. "_input", placeholder, default, callback)
+		return input
 	end
 
 	return tab
