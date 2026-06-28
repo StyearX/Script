@@ -330,12 +330,6 @@ local function BuildCustomPage(name)
 		New("UIListLayout", { Name = "RowListLayout", SortOrder = Enum.SortOrder.LayoutOrder, FillDirection = Enum.FillDirection.Vertical, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Top, Padding = UDim.new(0, 0) }),
 		New("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 11), PaddingBottom = UDim.new(0, 20) }),
 	})
-	pageFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		local contentHeight = pageFrame.AbsoluteSize.Y
-		if PageScroll then
-			PageScroll.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
-		end
-	end)
 	CustomTabPages[name] = pageFrame
 	return pageFrame, pageFrame
 end
@@ -534,7 +528,6 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 	local HOLDER_W = 502
 	local TRACK_X = BTN_W + BTN_GAP
 	local TRACK_W = HOLDER_W - (BTN_W + BTN_GAP) * 2
-	local DIVIDER_W = steps > 1 and 2 or 0
 	local SEG_H = 25
 	local holder = New("Frame", {
 		Parent = row,
@@ -576,8 +569,6 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Position = UDim2.new(0.5, -18, 0.5, -18),
 		ZIndex = 8,
 	}, { New("UIAspectRatioConstraint", { AspectRatio = 1 }) })
-	local totalDividers = steps > 1 and (steps - 1) or 0
-	local segW = math.floor((TRACK_W - totalDividers * DIVIDER_W) / steps)
 	local segments = {}
 	local dragging = false
 	local sliderApi = { Interactable = true }
@@ -606,12 +597,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 
 	local function setSliderFromX(x)
 		if not sliderApi.Interactable then return end
-		local first = segments[1]
-		local last = segments[steps]
-		if not first or not last then return end
-		local startX = first.AbsolutePosition.X
-		local endX = last.AbsolutePosition.X + last.AbsoluteSize.X
-		local alpha = math.clamp((x - startX) / (endX - startX), 0, 1)
+		local startX = holder.AbsolutePosition.X + TRACK_X
+		local alpha = math.clamp((x - startX) / TRACK_W, 0, 1)
 		if minStep > 0 then
 			setSliderValue(math.clamp(math.floor((alpha * steps) + 1), minStep, steps))
 		else
@@ -619,8 +606,14 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		end
 	end
 
+	local useGaps = steps <= 80
 	for i = 1, steps do
-		local posX = TRACK_X + (i - 1) * (segW + DIVIDER_W)
+		local x0 = TRACK_X + math.floor(TRACK_W * (i - 1) / steps)
+		local x1 = TRACK_X + math.floor(TRACK_W * i / steps)
+		local gapL = (useGaps and i > 1) and 1 or 0
+		local gapR = (useGaps and i < steps) and 1 or 0
+		local segPosX = x0 + gapL
+		local segWidth = math.max(1, x1 - x0 - gapL - gapR)
 		local seg = New("ImageButton", {
 			Parent = holder,
 			BackgroundColor3 = Color3.fromRGB(80, 80, 80),
@@ -628,23 +621,12 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 			BorderSizePixel = 0,
 			AutoButtonColor = false,
 			Image = "",
-			Size = UDim2.new(0, segW, 0, SEG_H),
-			Position = UDim2.new(0, posX, 0.5, -SEG_H / 2),
+			Size = UDim2.new(0, segWidth, 0, SEG_H),
+			Position = UDim2.new(0, segPosX, 0.5, -SEG_H / 2),
 			ZIndex = 7,
 		})
 		segments[i] = seg
 		AddConn(seg.MouseButton1Click:Connect(function() if sliderApi.Interactable then setSliderValue(i) end end))
-		if steps > 1 and i < steps then
-			New("Frame", {
-				Parent = holder,
-				BackgroundColor3 = Color3.fromRGB(15, 15, 15),
-				BackgroundTransparency = 0,
-				BorderSizePixel = 0,
-				Size = UDim2.new(0, DIVIDER_W, 0, SEG_H),
-				Position = UDim2.new(0, posX + segW, 0.5, -SEG_H / 2),
-				ZIndex = 8,
-			})
-		end
 	end
 
 	local capture = New("TextButton", {
@@ -1176,45 +1158,88 @@ function CoreUi:Tab(section, config)
 		config = config or {}
 		local title = config.Title or "Section"
 		local icon = config.Icon
-		local row = New("ImageButton", {
-			Name = title.."Section",
+		local secContainer = New("Frame", {
+			Name = title .. "Section",
 			Parent = self._page,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			ZIndex = 5,
+		}, {
+			New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 0),
+			}),
+		})
+		local headerRow = New("ImageButton", {
+			Name = title .. "SectionHeader",
+			Parent = secContainer,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Image = "",
 			Active = false,
 			AutoButtonColor = false,
 			Selectable = false,
-			Size = UDim2.new(1,0,0,48),
+			Size = UDim2.new(1, 0, 0, 48),
+			LayoutOrder = 1,
 			ZIndex = 5,
 		})
-		local iconAsset, iconData = ResolveIconAsset(icon)
+		local iconAsset = ResolveIconAsset(icon)
 		if iconAsset then
 			New("ImageLabel", {
 				Name = "Icon",
-				Parent = row,
+				Parent = headerRow,
 				BackgroundTransparency = 1,
 				Image = iconAsset,
-				ImageColor3 = Color3.fromRGB(255,255,255),
-				Size = UDim2.new(0,28,0,28),
-				Position = UDim2.new(0,10,0.5,-14),
+				ImageColor3 = Color3.fromRGB(255, 255, 255),
+				Size = UDim2.new(0, 28, 0, 28),
+				Position = UDim2.new(0, 10, 0.5, -14),
 				ZIndex = 6,
 			})
 		end
 		New("TextLabel", {
 			Name = "Title",
-			Parent = row,
+			Parent = headerRow,
 			BackgroundTransparency = 1,
 			Font = Enum.Font.BuilderSansMedium,
 			TextSize = 28,
-			TextColor3 = Color3.fromRGB(255,255,255),
+			TextColor3 = Color3.fromRGB(255, 255, 255),
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Text = title,
-			Size = UDim2.new(1,-20,1,-10),
-			Position = UDim2.new(0,icon and 44 or 10,0,10),
+			Size = UDim2.new(1, -20, 1, -10),
+			Position = UDim2.new(0, iconAsset and 44 or 10, 0, 10),
 			ZIndex = 6,
 		})
-		return row
+		local contentFrame = New("Frame", {
+			Name = title .. "SectionContent",
+			Parent = secContainer,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = 2,
+			ZIndex = 5,
+		}, {
+			New("UIListLayout", {
+				Name = "RowListLayout",
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				Padding = UDim.new(0, 0),
+			}),
+		})
+		local section = { _page = contentFrame, _section = title }
+		for k, v in pairs(tab) do
+			if type(v) == "function" and k:find("^Add") and k ~= "AddSection" then
+				section[k] = v
+			end
+		end
+		return section
 	end
 
 	function tab:AddParagraph(config)
