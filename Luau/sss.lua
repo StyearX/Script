@@ -212,6 +212,11 @@ end
 AddConn(MenuContainer:GetPropertyChangedSignal("Visible"):Connect(function()
 	if MenuContainer.Visible then
 		task.defer(function()
+			CurrentActiveTabType = "native"
+			CurrentActiveTabName = nil
+			for _, pg in next, CustomTabPages do pcall(function() pg.Visible = false; pg.Position = UDim2.new(2,0,0,0) end) end
+			for _, btn in next, CustomTabButtons do SetTabAppearance(btn, false) end
+			ShowNativePages()
 			if #NativeTabs > 0 then
 				ActivateNativeTab(NativeTabs[1])
 			end
@@ -498,11 +503,18 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 	minStep = minStep or 0
 	local currentIndex = math.clamp(index or 1, minStep, steps)
 	local row = MakeRow(page, name)
+	local BTN_W = 50
+	local BTN_GAP = 8
+	local HOLDER_W = 502
+	local TRACK_X = BTN_W + BTN_GAP
+	local TRACK_W = HOLDER_W - (BTN_W + BTN_GAP) * 2
+	local DIVIDER_W = steps > 1 and 2 or 0
+	local SEG_H = 25
 	local holder = New("Frame", {
 		Parent = row,
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0, 502, 0, 50),
-		Position = UDim2.new(1, -502, 0.5, -25),
+		Size = UDim2.new(0, HOLDER_W, 0, 50),
+		Position = UDim2.new(1, -HOLDER_W, 0.5, -25),
 		Active = true,
 		ZIndex = 6,
 	})
@@ -510,8 +522,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Parent = holder,
 		BackgroundTransparency = 1,
 		Image = "",
-		Size = UDim2.new(0, 60, 0, 50),
-		Position = UDim2.new(0, -10, 0.5, -25),
+		Size = UDim2.new(0, BTN_W, 0, 50),
+		Position = UDim2.new(0, 0, 0.5, -25),
 		ZIndex = 7,
 	})
 	New("ImageLabel", {
@@ -526,8 +538,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Parent = holder,
 		BackgroundTransparency = 1,
 		Image = "",
-		Size = UDim2.new(0, 50, 0, 50),
-		Position = UDim2.new(1, -50, 0.5, -25),
+		Size = UDim2.new(0, BTN_W, 0, 50),
+		Position = UDim2.new(1, -BTN_W, 0.5, -25),
 		ZIndex = 7,
 	})
 	New("ImageLabel", {
@@ -538,6 +550,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Position = UDim2.new(0.5, -18, 0.5, -18),
 		ZIndex = 8,
 	}, { New("UIAspectRatioConstraint", { AspectRatio = 1 }) })
+	local totalDividers = steps > 1 and (steps - 1) or 0
+	local segW = math.floor((TRACK_W - totalDividers * DIVIDER_W) / steps)
 	local segments = {}
 	local dragging = false
 	local sliderApi = { Interactable = true }
@@ -580,6 +594,7 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 	end
 
 	for i = 1, steps do
+		local posX = TRACK_X + (i - 1) * (segW + DIVIDER_W)
 		local seg = New("ImageButton", {
 			Parent = holder,
 			BackgroundColor3 = Color3.fromRGB(80, 80, 80),
@@ -587,12 +602,23 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 			BorderSizePixel = 0,
 			AutoButtonColor = false,
 			Image = "",
-			Size = UDim2.new(0, 35, 0, 25),
-			Position = UDim2.new(0, 60 + ((i - 1) * 39), 0.5, -12),
+			Size = UDim2.new(0, segW, 0, SEG_H),
+			Position = UDim2.new(0, posX, 0.5, -SEG_H / 2),
 			ZIndex = 7,
 		})
 		segments[i] = seg
 		AddConn(seg.MouseButton1Click:Connect(function() if sliderApi.Interactable then setSliderValue(i) end end))
+		if steps > 1 and i < steps then
+			New("Frame", {
+				Parent = holder,
+				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+				BackgroundTransparency = 0,
+				BorderSizePixel = 0,
+				Size = UDim2.new(0, DIVIDER_W, 0, SEG_H),
+				Position = UDim2.new(0, posX + segW, 0.5, -SEG_H / 2),
+				ZIndex = 7,
+			})
+		end
 	end
 
 	local capture = New("TextButton", {
@@ -602,8 +628,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Text = "",
 		AutoButtonColor = false,
 		Active = true,
-		Size = UDim2.new(0, 400, 1, 0),
-		Position = UDim2.new(0, 52, 0, 0),
+		Size = UDim2.new(0, TRACK_W, 1, 0),
+		Position = UDim2.new(0, TRACK_X, 0, 0),
 		ZIndex = 9,
 	})
 	AddConn(capture.InputBegan:Connect(function(input)
