@@ -637,12 +637,12 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		if steps > 1 and i < steps then
 			New("Frame", {
 				Parent = holder,
-				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+				BackgroundColor3 = Color3.fromRGB(15, 15, 15),
 				BackgroundTransparency = 0,
 				BorderSizePixel = 0,
 				Size = UDim2.new(0, DIVIDER_W, 0, SEG_H),
 				Position = UDim2.new(0, posX + segW, 0.5, -SEG_H / 2),
-				ZIndex = 7,
+				ZIndex = 8,
 			})
 		end
 	end
@@ -883,8 +883,8 @@ local function MakeDropdownPanel()
 		PaddingBottom = UDim.new(0,8),
 	})
 	local MAX_H = 320
-	list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		local h = math.min(list.AbsoluteContentSize.Y + 16, MAX_H)
+	listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		local h = math.min(listLayout.AbsoluteContentSize.Y + 16, MAX_H)
 		list.Size = UDim2.new(1, 0, 0, h)
 	end)
 	return overlay, panel, list
