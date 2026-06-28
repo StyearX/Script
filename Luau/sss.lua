@@ -211,7 +211,11 @@ local function ActivateNativeTab(activeNative)
 end
 AddConn(MenuContainer:GetPropertyChangedSignal("Visible"):Connect(function()
 	if MenuContainer.Visible then
-		if CurrentActiveTabType == "custom" and CurrentActiveTabName then task.defer(function() ActivateCustomTab(CurrentActiveTabName) end) end
+		task.defer(function()
+			if #NativeTabs > 0 then
+				ActivateNativeTab(NativeTabs[1])
+			end
+		end)
 	else
 		for _, pg in next, CustomTabPages do pcall(function() pg.Visible = false end) end
 	end
@@ -295,6 +299,12 @@ local function BuildCustomPage(name)
 		New("UIListLayout", { Name = "RowListLayout", SortOrder = Enum.SortOrder.LayoutOrder, FillDirection = Enum.FillDirection.Vertical, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Top, Padding = UDim.new(0, 0) }),
 		New("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 11), PaddingBottom = UDim.new(0, 20) }),
 	})
+	pageFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		local contentHeight = pageFrame.AbsoluteSize.Y
+		if PageScroll then
+			PageScroll.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+		end
+	end)
 	CustomTabPages[name] = pageFrame
 	return pageFrame, pageFrame
 end
@@ -508,8 +518,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Parent = left,
 		BackgroundTransparency = 1,
 		Image = "rbxasset://textures/ui/Settings/Slider/Less.png",
-		Size = UDim2.new(0, 22, 0, 22),
-		Position = UDim2.new(0.5, -11, 0.5, -11),
+		Size = UDim2.new(0, 36, 0, 36),
+		Position = UDim2.new(0.5, -18, 0.5, -18),
 		ZIndex = 8,
 	}, { New("UIAspectRatioConstraint", { AspectRatio = 1 }) })
 	local right = New("ImageButton", {
@@ -524,8 +534,8 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		Parent = right,
 		BackgroundTransparency = 1,
 		Image = "rbxasset://textures/ui/Settings/Slider/More.png",
-		Size = UDim2.new(0, 22, 0, 22),
-		Position = UDim2.new(0.5, -11, 0.5, -11),
+		Size = UDim2.new(0, 36, 0, 36),
+		Position = UDim2.new(0.5, -18, 0.5, -18),
 		ZIndex = 8,
 	}, { New("UIAspectRatioConstraint", { AspectRatio = 1 }) })
 	local segments = {}
@@ -573,7 +583,7 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 		local seg = New("ImageButton", {
 			Parent = holder,
 			BackgroundColor3 = Color3.fromRGB(80, 80, 80),
-			BackgroundTransparency = 0.36,
+			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
 			AutoButtonColor = false,
 			Image = "",
@@ -930,7 +940,6 @@ function CoreUi:Tab(section, config)
 		config = config or {}
 		local title = config.Title or "Section"
 		local icon = config.Icon
-		local desc = config.Description or ""
 		local row = New("ImageButton", {
 			Name = title.."Section",
 			Parent = self._page,
@@ -940,7 +949,7 @@ function CoreUi:Tab(section, config)
 			Active = false,
 			AutoButtonColor = false,
 			Selectable = false,
-			Size = UDim2.new(1,0,0,desc ~= "" and 64 or 48),
+			Size = UDim2.new(1,0,0,48),
 			ZIndex = 5,
 		})
 		local iconAsset, iconData = ResolveIconAsset(icon)
@@ -969,21 +978,74 @@ function CoreUi:Tab(section, config)
 			Position = UDim2.new(0,icon and 44 or 10,0,10),
 			ZIndex = 6,
 		})
-		if desc and desc ~= "" then
+		return row
+	end
+
+	function tab:AddParagraph(config)
+		config = config or {}
+		local title = config.Title or ""
+		local content = config.Content or ""
+		local row = New("ImageButton", {
+			Name = (title ~= "" and title or "Paragraph").."ParagraphRow",
+			Parent = self._page,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Image = "",
+			Active = false,
+			AutoButtonColor = false,
+			Selectable = false,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1,0,0,0),
+			ZIndex = 5,
+		})
+		New("UIListLayout", {
+			Parent = row,
+			FillDirection = Enum.FillDirection.Vertical,
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			VerticalAlignment = Enum.VerticalAlignment.Top,
+			Padding = UDim.new(0, 4),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		})
+		New("UIPadding", {
+			Parent = row,
+			PaddingLeft = UDim.new(0, 10),
+			PaddingRight = UDim.new(0, 10),
+			PaddingTop = UDim.new(0, 8),
+			PaddingBottom = UDim.new(0, 8),
+		})
+		if title ~= "" then
 			New("TextLabel", {
-				Name = "Description",
+				Name = "ParagraphTitle",
+				Parent = row,
+				BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium,
+				TextSize = 22,
+				TextColor3 = Color3.fromRGB(220,220,220),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextWrapped = true,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Text = title,
+				Size = UDim2.new(1,-20,0,0),
+				ZIndex = 6,
+				LayoutOrder = 1,
+			})
+		end
+		if content ~= "" then
+			New("TextLabel", {
+				Name = "ParagraphContent",
 				Parent = row,
 				BackgroundTransparency = 1,
 				Font = Enum.Font.BuilderSansMedium,
 				TextSize = 18,
-				TextColor3 = Color3.fromRGB(150,150,150),
+				TextColor3 = Color3.fromRGB(160,160,160),
 				TextXAlignment = Enum.TextXAlignment.Left,
-				Text = desc,
-				Size = UDim2.new(1,-20,0,24),
-				Position = UDim2.new(0,icon and 44 or 10,0.6,0),
+				TextWrapped = true,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Text = content,
+				Size = UDim2.new(1,-20,0,0),
 				ZIndex = 6,
+				LayoutOrder = 2,
 			})
-			row.Size = UDim2.new(1,0,0,64)
 		end
 		return row
 	end
