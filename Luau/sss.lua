@@ -130,6 +130,23 @@ local PageScroll = PageViewClipper:WaitForChild("PageView")
 local PageInner = PageScroll:FindFirstChild("PageViewInnerFrame") or PageScroll:WaitForChild("PageViewInnerFrame")
 local OverlayRoot = Shield
 
+local CustomPageRoot = New("ScrollingFrame", {
+	Name = "CoreUiCustomPageRoot",
+	Parent = PageViewClipper,
+	Size = UDim2.new(1, 0, 1, 0),
+	Position = UDim2.new(0, 0, 0, 0),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 0,
+	ScrollingDirection = Enum.ScrollingDirection.Y,
+	CanvasSize = UDim2.new(0, 0, 0, 0),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollingEnabled = true,
+	ClipsDescendants = true,
+	ZIndex = 5,
+	Visible = false,
+})
+
 local NativeTabs = {}
 local NativePages = {}
 local NativeScrollbars = {}
@@ -164,29 +181,23 @@ local function RefreshNativePagesList()
 	end
 end
 local function ShowNativePages()
+	PageScroll.Visible = true
+	CustomPageRoot.Visible = false
 	for _, page in next, NativePages do pcall(function() page.Visible = true end) end
 	for _, data in next, NativeScrollbars do if data.scroll then data.scroll.ScrollBarThickness = data.thickness end end
 end
 local function HideNativePages()
-	for _, page in next, NativePages do pcall(function() page.Visible = false end) end
-	for _, data in next, NativeScrollbars do if data.scroll then data.scroll.ScrollBarThickness = 0 end end
+	PageScroll.Visible = false
+	CustomPageRoot.Visible = true
 end
 local SetTabAppearance
 local function ActivateCustomTab(name)
 	CurrentActiveTabType = "custom"; CurrentActiveTabName = name
 	HideNativePages()
-	if PageScroll then
-		PageScroll.CanvasPosition = Vector2.new(0, 0)
-		local activePg = CustomTabPages[name]
-		if activePg then
-			task.defer(function()
-				if activePg.Parent and activePg.Visible then
-					PageScroll.CanvasSize = UDim2.new(0, 0, 0, activePg.AbsoluteSize.Y)
-				end
-			end)
-		end
+	for n, pg in next, CustomTabPages do
+		pg.Visible = (n == name)
 	end
-	for n, pg in next, CustomTabPages do pg.Visible = (n == name); pg.Position = (n == name) and UDim2.new(0,0,0,0) or UDim2.new(2,0,0,0) end
+	CustomPageRoot.CanvasPosition = Vector2.new(0, 0)
 	for n, btn in next, CustomTabButtons do SetTabAppearance(btn, n == name) end
 	for _, nt in next, NativeTabs do
 		local sel = nt:FindFirstChild("TabSelection"); if sel then sel.Visible = false end
