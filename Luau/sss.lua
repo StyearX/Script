@@ -175,6 +175,17 @@ local SetTabAppearance
 local function ActivateCustomTab(name)
 	CurrentActiveTabType = "custom"; CurrentActiveTabName = name
 	HideNativePages()
+	if PageScroll then
+		PageScroll.CanvasPosition = Vector2.new(0, 0)
+		local activePg = CustomTabPages[name]
+		if activePg then
+			task.defer(function()
+				if activePg.Parent and activePg.Visible then
+					PageScroll.CanvasSize = UDim2.new(0, 0, 0, activePg.AbsoluteSize.Y)
+				end
+			end)
+		end
+	end
 	for n, pg in next, CustomTabPages do pg.Visible = (n == name); pg.Position = (n == name) and UDim2.new(0,0,0,0) or UDim2.new(2,0,0,0) end
 	for n, btn in next, CustomTabButtons do SetTabAppearance(btn, n == name) end
 	for _, nt in next, NativeTabs do
@@ -330,6 +341,45 @@ local function BuildCustomPage(name)
 		New("UIListLayout", { Name = "RowListLayout", SortOrder = Enum.SortOrder.LayoutOrder, FillDirection = Enum.FillDirection.Vertical, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Top, Padding = UDim.new(0, 0) }),
 		New("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 11), PaddingBottom = UDim.new(0, 20) }),
 	})
+	local dragY0, canvasY0, pageDrag = 0, 0, false
+	AddConn(pageFrame.InputBegan:Connect(function(input)
+		if not pageFrame.Visible then return end
+		if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+		local target = input.Target
+		if target and target ~= pageFrame and target.Active and (target:IsA("TextButton") or target:IsA("ImageButton") or target:IsA("TextBox")) then return end
+		pageDrag = true
+		dragY0 = input.Position.Y
+		canvasY0 = PageScroll and PageScroll.CanvasPosition.Y or 0
+	end))
+	AddConn(UserInputService.InputChanged:Connect(function(input)
+		if not pageDrag or not pageFrame.Visible then return end
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			if PageScroll then
+				local maxC = math.max(0, PageScroll.AbsoluteCanvasSize.Y - PageScroll.AbsoluteSize.Y)
+				PageScroll.CanvasPosition = Vector2.new(0, math.clamp(canvasY0 + (dragY0 - input.Position.Y), 0, maxC))
+			end
+		end
+	end))
+	AddConn(UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			pageDrag = false
+		end
+	end))
+	AddConn(pageFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		if pageFrame.Visible and PageScroll then
+			PageScroll.CanvasSize = UDim2.new(0, 0, 0, pageFrame.AbsoluteSize.Y)
+		end
+	end))
+	AddConn(pageFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+		if pageFrame.Visible and PageScroll then
+			PageScroll.CanvasPosition = Vector2.new(0, 0)
+			task.defer(function()
+				if pageFrame.Parent and pageFrame.Visible then
+					PageScroll.CanvasSize = UDim2.new(0, 0, 0, pageFrame.AbsoluteSize.Y)
+				end
+			end)
+		end
+	end))
 	CustomTabPages[name] = pageFrame
 	return pageFrame, pageFrame
 end
@@ -661,8 +711,22 @@ local function MakeSlider(page, name, steps, index, changed, minStep)
 			dragging = false
 		end
 	end))
-	AddConn(left.MouseButton1Click:Connect(function() if sliderApi.Interactable then setSliderValue(currentIndex - 1) end end))
-	AddConn(right.MouseButton1Click:Connect(function() if sliderApi.Interactable then setSliderValue(currentIndex + 1) end end))
+	local function makeHoldRepeat(btn, action)
+		local holding = false
+		AddConn(btn.MouseButton1Down:Connect(function()
+			if not sliderApi.Interactable then return end
+			holding = true
+			action()
+			task.spawn(function()
+				task.wait(0.35)
+				while holding do action(); task.wait(0.055) end
+			end)
+		end))
+		AddConn(btn.MouseButton1Up:Connect(function() holding = false end))
+		AddConn(btn.MouseLeave:Connect(function() holding = false end))
+	end
+	makeHoldRepeat(left, function() setSliderValue(currentIndex - 1) end)
+	makeHoldRepeat(right, function() setSliderValue(currentIndex + 1) end)
 	refresh(true)
 
 	function sliderApi:SetValue(value)
@@ -1143,6 +1207,231 @@ local function MakeDropDownMulti(page, name, options, defaultValues, changed)
 	return api
 end
 
+local function MakeColorPicker(page, name, defaultColor, changed)
+	local cH, cS, cV = Color3.toHSV(defaultColor or Color3.fromRGB(255, 0, 0))
+	local row = MakeRow(page, name)
+	local swatchBtn = New("ImageButton", {
+		Parent = row,
+		BackgroundColor3 = Color3.fromHSV(cH, cS, cV),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Image = "",
+		Size = UDim2.new(0, 32, 0, 32),
+		Position = UDim2.new(1, -350, 0.5, -16),
+		ZIndex = 6,
+	}, {
+		New("UICorner", { CornerRadius = UDim.new(0, 4) }),
+		New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.7, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	local cpApi = { Interactable = true, Value = Color3.fromHSV(cH, cS, cV) }
+	local function openPicker()
+		OpenOverlay(function(dimmer)
+			local lH, lS, lV = cH, cS, cV
+			local oldColor = Color3.fromHSV(lH, lS, lV)
+			local dialog = New("Frame", {
+				Parent = dimmer,
+				Size = UDim2.fromOffset(420, 310),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, 0.5, 0),
+				BackgroundColor3 = Color3.fromRGB(12, 12, 12),
+				BackgroundTransparency = 0.1,
+				BorderSizePixel = 0,
+				ZIndex = 21,
+			}, {
+				New("UICorner", { CornerRadius = UDim.new(0, 10) }),
+				New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.82, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+			})
+			New("TextLabel", {
+				Parent = dialog, Text = name,
+				Font = Enum.Font.BuilderSansMedium, TextSize = 22,
+				TextColor3 = Color3.fromRGB(225, 225, 225),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, -20, 0, 40), Position = UDim2.fromOffset(16, 4), ZIndex = 22,
+			})
+			New("Frame", {
+				Parent = dialog, Size = UDim2.new(1, -32, 0, 1), Position = UDim2.fromOffset(16, 42),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.85, BorderSizePixel = 0, ZIndex = 22,
+			})
+			local svMap = New("Frame", {
+				Parent = dialog, Size = UDim2.fromOffset(180, 150), Position = UDim2.fromOffset(20, 52),
+				BackgroundColor3 = Color3.fromHSV(lH, 1, 1), ZIndex = 22, BorderSizePixel = 0,
+			}, { New("UICorner", { CornerRadius = UDim.new(0, 6) }) })
+			New("Frame", { Parent = svMap, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 23, BorderSizePixel = 0 }, {
+				New("UICorner", { CornerRadius = UDim.new(0, 6) }),
+				New("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }) }),
+			})
+			New("Frame", { Parent = svMap, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), ZIndex = 24, BorderSizePixel = 0 }, {
+				New("UICorner", { CornerRadius = UDim.new(0, 6) }),
+				New("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }), Rotation = 90 }),
+			})
+			local svCursor = New("Frame", {
+				Parent = svMap, Size = UDim2.fromOffset(12, 12), AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(lS, 0, 1 - lV, 0), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 26, BorderSizePixel = 0,
+			}, {
+				New("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				New("UIStroke", { Color = Color3.fromRGB(40, 40, 40), Thickness = 1.5 }),
+			})
+			local hueKp = {}
+			for i = 0, 6 do hueKp[i + 1] = ColorSequenceKeypoint.new(i / 6, Color3.fromHSV(i / 6, 1, 1)) end
+			local hueStrip = New("Frame", {
+				Parent = dialog, Size = UDim2.fromOffset(14, 150), Position = UDim2.fromOffset(212, 52), ZIndex = 22, BorderSizePixel = 0,
+			}, {
+				New("UICorner", { CornerRadius = UDim.new(0, 6) }),
+				New("UIGradient", { Color = ColorSequence.new(hueKp), Rotation = 90 }),
+			})
+			local hueCursor = New("Frame", {
+				Parent = hueStrip, Size = UDim2.fromOffset(20, 6), AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, lH, 0), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 24, BorderSizePixel = 0,
+			}, {
+				New("UICorner", { CornerRadius = UDim.new(0, 3) }),
+				New("UIStroke", { Color = Color3.fromRGB(50, 50, 50), Thickness = 1 }),
+			})
+			local function makePreview(pos, color)
+				return New("Frame", {
+					Parent = dialog, Size = UDim2.fromOffset(88, 26), Position = pos,
+					BackgroundColor3 = color, ZIndex = 22, BorderSizePixel = 0,
+				}, {
+					New("UICorner", { CornerRadius = UDim.new(0, 4) }),
+					New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.8, Thickness = 1 }),
+				})
+			end
+			local oldFrame = makePreview(UDim2.fromOffset(20, 218), oldColor)
+			local newFrame = makePreview(UDim2.fromOffset(112, 218), Color3.fromHSV(lH, lS, lV))
+			for _, t in next, { { "Old", 20 }, { "New", 112 } } do
+				New("TextLabel", {
+					Parent = dialog, Text = t[1], Font = Enum.Font.BuilderSansMedium, TextSize = 14,
+					TextColor3 = Color3.fromRGB(130, 130, 130), BackgroundTransparency = 1,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					Size = UDim2.fromOffset(88, 16), Position = UDim2.fromOffset(t[2], 203), ZIndex = 22,
+				})
+			end
+			local function makeInputPair(x, y, labelText)
+				New("TextLabel", {
+					Parent = dialog, Text = labelText, Font = Enum.Font.BuilderSansMedium, TextSize = 16,
+					TextColor3 = Color3.fromRGB(150, 150, 150), TextXAlignment = Enum.TextXAlignment.Right,
+					BackgroundTransparency = 1, Size = UDim2.fromOffset(28, 28), Position = UDim2.fromOffset(x, y), ZIndex = 22,
+				})
+				local f = New("Frame", {
+					Parent = dialog, Size = UDim2.fromOffset(130, 28), Position = UDim2.fromOffset(x + 32, y),
+					BackgroundColor3 = Color3.fromRGB(18, 18, 18), BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 22,
+				}, {
+					New("UICorner", { CornerRadius = UDim.new(0, 4) }),
+					New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.75, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+				})
+				return New("TextBox", {
+					Parent = f, Size = UDim2.new(1, -8, 1, 0), Position = UDim2.fromOffset(4, 0),
+					BackgroundTransparency = 1, Font = Enum.Font.BuilderSansMedium, TextSize = 18,
+					TextColor3 = Color3.fromRGB(220, 220, 220), PlaceholderColor3 = Color3.fromRGB(100, 100, 100),
+					Text = "", TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 23,
+				})
+			end
+			local hexTb = makeInputPair(238, 56, "Hex")
+			local rTb   = makeInputPair(238, 92, "R")
+			local gTb   = makeInputPair(238, 128, "G")
+			local bTb   = makeInputPair(238, 164, "B")
+			local function getColor() return Color3.fromHSV(lH, lS, lV) end
+			local function display()
+				svMap.BackgroundColor3 = Color3.fromHSV(lH, 1, 1)
+				svCursor.Position = UDim2.new(lS, 0, 1 - lV, 0)
+				hueCursor.Position = UDim2.new(0.5, 0, lH, 0)
+				newFrame.BackgroundColor3 = getColor()
+				local c = getColor()
+				hexTb.Text = "#" .. c:ToHex():upper()
+				rTb.Text = tostring(math.floor(c.R * 255 + 0.5))
+				gTb.Text = tostring(math.floor(c.G * 255 + 0.5))
+				bTb.Text = tostring(math.floor(c.B * 255 + 0.5))
+			end
+			display()
+			local svDrag, hueDrag = false, false
+			local uisMove, uisEnd
+			uisMove = UserInputService.InputChanged:Connect(function(input)
+				if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+				if svDrag then
+					local a, s = svMap.AbsolutePosition, svMap.AbsoluteSize
+					lS = math.clamp((input.Position.X - a.X) / s.X, 0, 1)
+					lV = 1 - math.clamp((input.Position.Y - a.Y) / s.Y, 0, 1)
+					display()
+				elseif hueDrag then
+					local a, s = hueStrip.AbsolutePosition, hueStrip.AbsoluteSize
+					lH = math.clamp((input.Position.Y - a.Y) / s.Y, 0, 1)
+					display()
+				end
+			end)
+			uisEnd = UserInputService.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					svDrag = false; hueDrag = false
+				end
+			end)
+			local function cleanUp() uisMove:Disconnect(); uisEnd:Disconnect() end
+			AddConn(svMap.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					svDrag = true
+					local a, s = svMap.AbsolutePosition, svMap.AbsoluteSize
+					lS = math.clamp((input.Position.X - a.X) / s.X, 0, 1)
+					lV = 1 - math.clamp((input.Position.Y - a.Y) / s.Y, 0, 1)
+					display()
+				end
+			end))
+			AddConn(hueStrip.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					hueDrag = true
+					local a, s = hueStrip.AbsolutePosition, hueStrip.AbsoluteSize
+					lH = math.clamp((input.Position.Y - a.Y) / s.Y, 0, 1)
+					display()
+				end
+			end))
+			AddConn(hexTb.FocusLost:Connect(function(enter)
+				if enter then
+					local ok, c = pcall(Color3.fromHex, hexTb.Text:gsub("#", ""))
+					if ok and typeof(c) == "Color3" then lH, lS, lV = Color3.toHSV(c) end
+				end
+				display()
+			end))
+			local function applyRGB(r, g, b)
+				local ok, c = pcall(Color3.fromRGB, r, g, b); if ok then lH, lS, lV = Color3.toHSV(c) end
+			end
+			AddConn(rTb.FocusLost:Connect(function(e)
+				if e then local n = tonumber(rTb.Text); if n then local c = getColor(); applyRGB(math.clamp(n,0,255), math.floor(c.G*255+0.5), math.floor(c.B*255+0.5)) end end display()
+			end))
+			AddConn(gTb.FocusLost:Connect(function(e)
+				if e then local n = tonumber(gTb.Text); if n then local c = getColor(); applyRGB(math.floor(c.R*255+0.5), math.clamp(n,0,255), math.floor(c.B*255+0.5)) end end display()
+			end))
+			AddConn(bTb.FocusLost:Connect(function(e)
+				if e then local n = tonumber(bTb.Text); if n then local c = getColor(); applyRGB(math.floor(c.R*255+0.5), math.floor(c.G*255+0.5), math.clamp(n,0,255)) end end display()
+			end))
+			local cancelBtn = MakeStyledButton("CpCancel", "Cancel", UDim2.fromOffset(88, 34), function()
+				cleanUp(); CloseActiveOverlay()
+			end)
+			cancelBtn.Parent = dialog; cancelBtn.Position = UDim2.fromOffset(226, 262); cancelBtn.ZIndex = 22
+			local doneBtn = MakeStyledButton("CpDone", "Done", UDim2.fromOffset(88, 34), function()
+				cleanUp()
+				cH, cS, cV = lH, lS, lV
+				local finalColor = getColor()
+				cpApi.Value = finalColor
+				swatchBtn.BackgroundColor3 = finalColor
+				if changed then changed(finalColor) end
+				CloseActiveOverlay()
+			end)
+			doneBtn.Parent = dialog; doneBtn.Position = UDim2.fromOffset(318, 262); doneBtn.ZIndex = 22
+		end)
+	end
+	AddConn(swatchBtn.MouseButton1Click:Connect(function()
+		if cpApi.Interactable then openPicker() end
+	end))
+	function cpApi:SetValue(color)
+		cH, cS, cV = Color3.toHSV(color)
+		cpApi.Value = color
+		swatchBtn.BackgroundColor3 = color
+	end
+	function cpApi:SetInteractable(interactable)
+		cpApi.Interactable = interactable
+		Tween(swatchBtn, 0.15, { BackgroundTransparency = interactable and 0 or 0.5 })
+	end
+	return cpApi
+end
+
 function CoreUi:Tab(section, config)
 	config = config or {}
 	local title = config.Title or section
@@ -1495,6 +1784,72 @@ function CoreUi:Tab(section, config)
 		return input
 	end
 
+	function tab:AddColorPicker(config)
+		config = config or {}
+		local title = config.Title or "Color"
+		local desc = config.Description or ""
+		local default = config.Default or Color3.fromRGB(255, 0, 0)
+		local callback = config.Callback or function() end
+		local row = MakeRow(self, title)
+		if desc and desc ~= "" then
+			New("TextLabel", {
+				Parent = row, BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium, TextSize = 18,
+				TextColor3 = Color3.fromRGB(150, 150, 150), TextXAlignment = Enum.TextXAlignment.Left,
+				Text = desc, Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0.6, 0), ZIndex = 6,
+			})
+			row.Size = UDim2.new(1, 0, 0, 70)
+		end
+		local picker = MakeColorPicker(self, title .. "_color", default, callback)
+		return picker
+	end
+
+	function tab:AddParagraph(config)
+		config = config or {}
+		local title = config.Title or ""
+		local content = config.Content or ""
+		local container = New("Frame", {
+			Name = (title ~= "" and title or "Paragraph") .. "Row",
+			Parent = self._page,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			ZIndex = 5,
+		}, {
+			New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Vertical,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 4),
+			}),
+			New("UIPadding", {
+				PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10),
+				PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8),
+			}),
+		})
+		if title ~= "" then
+			New("TextLabel", {
+				Parent = container, BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium, TextSize = 22,
+				TextColor3 = Color3.fromRGB(215, 215, 215), TextXAlignment = Enum.TextXAlignment.Left,
+				TextWrapped = true, Text = title,
+				Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+				ZIndex = 6, LayoutOrder = 1,
+			})
+		end
+		if content ~= "" then
+			New("TextLabel", {
+				Parent = container, BackgroundTransparency = 1,
+				Font = Enum.Font.BuilderSansMedium, TextSize = 18,
+				TextColor3 = Color3.fromRGB(150, 150, 150), TextXAlignment = Enum.TextXAlignment.Left,
+				TextWrapped = true, Text = content,
+				Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+				ZIndex = 6, LayoutOrder = 2,
+			})
+		end
+		return container
+	end
+
 	return tab
 end
 
@@ -1540,5 +1895,56 @@ end
 function Api:GetCurrentTab() return CurrentActiveTabType, CurrentActiveTabName end
 Api.Instance = CoreUi
 CoreUi.Api = Api
+
+function CoreUi:SetInfo(config)
+	config = config or {}
+	local title = config.Title or "Hub"
+	local icon = config.Icon
+	local ex = HubBar:FindFirstChild("CoreUiInfoPanel"); if ex then ex:Destroy() end
+	local panel = New("Frame", {
+		Name = "CoreUiInfoPanel",
+		Parent = HubBar,
+		BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+		BackgroundTransparency = 0.4,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.new(0, 0, 0, 34),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		ZIndex = 8,
+		BorderSizePixel = 0,
+	}, {
+		New("UICorner", { CornerRadius = UDim.new(0, 6) }),
+		New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.8, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		New("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, 6),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+		New("UIPadding", {
+			PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12),
+		}),
+	})
+	local iconAsset = ResolveIconAsset(icon)
+	if iconAsset then
+		New("ImageLabel", {
+			Name = "Icon", Parent = panel,
+			BackgroundTransparency = 1,
+			Image = iconAsset, ImageColor3 = Color3.fromRGB(210, 210, 210),
+			Size = UDim2.fromOffset(18, 18), ZIndex = 9, LayoutOrder = 1,
+		}, { New("UIAspectRatioConstraint", {}) })
+	end
+	New("TextLabel", {
+		Name = "Title", Parent = panel,
+		BackgroundTransparency = 1,
+		Font = Enum.Font.BuilderSansMedium, TextSize = 18,
+		TextColor3 = Color3.fromRGB(210, 210, 210),
+		Text = title,
+		Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X,
+		ZIndex = 9, LayoutOrder = 2,
+	})
+	return panel
+end
 
 return CoreUi
