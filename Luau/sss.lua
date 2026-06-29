@@ -341,45 +341,6 @@ local function BuildCustomPage(name)
 		New("UIListLayout", { Name = "RowListLayout", SortOrder = Enum.SortOrder.LayoutOrder, FillDirection = Enum.FillDirection.Vertical, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Top, Padding = UDim.new(0, 0) }),
 		New("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 11), PaddingBottom = UDim.new(0, 20) }),
 	})
-	local dragY0, canvasY0, pageDrag = 0, 0, false
-	AddConn(pageFrame.InputBegan:Connect(function(input)
-		if not pageFrame.Visible then return end
-		if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-		local target = input.Target
-		if target and target ~= pageFrame and target.Active and (target:IsA("TextButton") or target:IsA("ImageButton") or target:IsA("TextBox")) then return end
-		pageDrag = true
-		dragY0 = input.Position.Y
-		canvasY0 = PageScroll and PageScroll.CanvasPosition.Y or 0
-	end))
-	AddConn(UserInputService.InputChanged:Connect(function(input)
-		if not pageDrag or not pageFrame.Visible then return end
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			if PageScroll then
-				local maxC = math.max(0, PageScroll.AbsoluteCanvasSize.Y - PageScroll.AbsoluteSize.Y)
-				PageScroll.CanvasPosition = Vector2.new(0, math.clamp(canvasY0 + (dragY0 - input.Position.Y), 0, maxC))
-			end
-		end
-	end))
-	AddConn(UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			pageDrag = false
-		end
-	end))
-	AddConn(pageFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		if pageFrame.Visible and PageScroll then
-			PageScroll.CanvasSize = UDim2.new(0, 0, 0, pageFrame.AbsoluteSize.Y)
-		end
-	end))
-	AddConn(pageFrame:GetPropertyChangedSignal("Visible"):Connect(function()
-		if pageFrame.Visible and PageScroll then
-			PageScroll.CanvasPosition = Vector2.new(0, 0)
-			task.defer(function()
-				if pageFrame.Parent and pageFrame.Visible then
-					PageScroll.CanvasSize = UDim2.new(0, 0, 0, pageFrame.AbsoluteSize.Y)
-				end
-			end)
-		end
-	end))
 	CustomTabPages[name] = pageFrame
 	return pageFrame, pageFrame
 end
@@ -1906,10 +1867,10 @@ function CoreUi:SetInfo(config)
 		Parent = HubBar,
 		BackgroundColor3 = Color3.fromRGB(15, 15, 15),
 		BackgroundTransparency = 0.4,
-		AnchorPoint = Vector2.new(0.5, 0.5),
+		AnchorPoint = Vector2.new(0.5, 1),
 		Size = UDim2.new(0, 0, 0, 34),
 		AutomaticSize = Enum.AutomaticSize.X,
-		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, -8),
 		ZIndex = 8,
 		BorderSizePixel = 0,
 	}, {
