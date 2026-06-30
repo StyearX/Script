@@ -7,6 +7,7 @@ return function(Tabs)
 
     secDiscord:AddDivider()
 
+    Tabs.info:AddSpace({ Height = 20 })
     local secTikTok = Tabs.info:AddSection("TikTok", "solar/music-note-bold")
 
     secTikTok:AddImage({
@@ -51,6 +52,7 @@ return function(Tabs)
 
     secTikTok:AddDivider()
 
+    Tabs.info:AddSpace({ Height = 20 })
     local secYouTube = Tabs.info:AddSection("YouTube", "solar/videocamera-record-bold")
 
     secYouTube:AddImage({

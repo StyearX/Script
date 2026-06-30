@@ -461,6 +461,8 @@ return function(Tabs)
     })
 
 
+    Tabs.Main:AddSpace({ Height = 20 })
+
     Tabs.Main:AddSection("Client Information", "solar/widget-2-bold")
     Tabs.Main:AddDivider()
 
@@ -482,6 +484,8 @@ return function(Tabs)
         Content = GetExecutedSince()
     })
 
+
+    Tabs.Main:AddSpace({ Height = 20 })
 
     Tabs.Main:AddSection("System Information", "solar/widget-2-bold")
     Tabs.Main:AddDivider()
@@ -564,6 +568,8 @@ return function(Tabs)
     end)
 
 
+    Tabs.Main:AddSpace({ Height = 20 })
+
     Tabs.Main:AddSection("Player Information", "solar/widget-2-bold")
     Tabs.Main:AddDivider()
 
@@ -596,6 +602,8 @@ return function(Tabs)
         Content = accountCreationString
     })
 
+
+    Tabs.Main:AddSpace({ Height = 20 })
 
     Tabs.Main:AddSection("Friends Data", "solar/widget-2-bold")
     Tabs.Main:AddDivider()
@@ -634,6 +642,8 @@ return function(Tabs)
         FriendsTotalParagraph:SetDesc(tostring(TotalFriends))
     end)
 
+
+    Tabs.Main:AddSpace({ Height = 20 })
 
     Tabs.Main:AddSection("Server Tools", "solar/widget-2-bold")
     Tabs.Main:AddDivider()
@@ -760,6 +770,7 @@ return function(Tabs)
         Description = "Choose between small or random server hopping",
         Values = {"Random", "Small"},
         Default = "Random",
+        Search = false,
         Callback = function(value)
             pcall(function()
                 AutoServerHopType = value
