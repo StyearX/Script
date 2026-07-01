@@ -652,7 +652,16 @@ return function(Tabs)
         Title = "Rejoin",
         Description = "Rejoin the current server",
         Icon = "refresh-cw",
-        Callback = function() rejoinServer() end
+        Callback = function()
+            Window:Dialog({
+                Title = "Rejoin",
+                Content = "Are you sure you want to rejoin the current server?",
+                Buttons = {
+                    { Title = "Yes", Callback = function() rejoinServer() end },
+                    { Title = "No" },
+                },
+            })
+        end
     })
 
     Tabs.Main:AddButton({
@@ -683,14 +692,32 @@ return function(Tabs)
         Title = "Server Hop",
         Description = "Hop to a random server",
         Icon = "shuffle",
-        Callback = function() serverHop() end
+        Callback = function()
+            Window:Dialog({
+                Title = "Server Hop",
+                Content = "Hop to a random server? You will leave this server.",
+                Buttons = {
+                    { Title = "Hop", Callback = function() serverHop() end },
+                    { Title = "Cancel" },
+                },
+            })
+        end
     })
 
     Tabs.Main:AddButton({
         Title = "Hop to Small Server",
         Description = "Hop to the smallest available server",
         Icon = "minimize",
-        Callback = function() hopToSmallServer() end
+        Callback = function()
+            Window:Dialog({
+                Title = "Small Server Hop",
+                Content = "Hop to the smallest available server? You will leave this server.",
+                Buttons = {
+                    { Title = "Hop", Callback = function() hopToSmallServer() end },
+                    { Title = "Cancel" },
+                },
+            })
+        end
     })
 
     Tabs.Main:AddButton({
@@ -698,10 +725,19 @@ return function(Tabs)
         Description = "Finding a Server inside your game",
         Icon = "server",
         Callback = function()
-            pcall(function()
-                loadstring(game:HttpGet("https://darahub.pages.dev/raw-script/Tools/Advanced%20Server%20Hop.lua"))()
-            end)
-            Fluent:Notify({ Title = "Success", Content = "Advanced Server Hop Loaded", Duration = 3 })
+            Window:Dialog({
+                Title = "Advanced Server Hop",
+                Content = "Load the Advanced Server Hop script? This will search for a server and teleport you.",
+                Buttons = {
+                    { Title = "Load", Callback = function()
+                        pcall(function()
+                            loadstring(game:HttpGet("https://darahub.pages.dev/raw-script/Tools/Advanced%20Server%20Hop.lua"))()
+                        end)
+                        Fluent:Notify({ Title = "Success", Content = "Advanced Server Hop Loaded", Duration = 3 })
+                    end },
+                    { Title = "Cancel" },
+                },
+            })
         end
     })
 
