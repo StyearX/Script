@@ -1,4 +1,6 @@
-local CommonServices = {
+local Environment = (type(getgenv) == "function") and getgenv() or _G
+
+local ServiceList = {
 	"Players",
 	"Workspace",
 	"ReplicatedStorage",
@@ -24,6 +26,7 @@ local CommonServices = {
 	"GuiService",
 	"ContentProvider",
 	"Chat",
+	"TextChatService",
 	"BadgeService",
 	"InsertService",
 	"PhysicsService",
@@ -41,11 +44,6 @@ local CommonServices = {
 	"LogService",
 	"ScriptContext",
 	"Stats",
-	"SystemDataStoreService",
-	"VoiceChatService",
-	"TextChatService",
-	"AvatarEditorService",
-	"PolicyService",
 	"AssetService",
 	"KeyframeSequenceProvider",
 	"AnimationClipProvider",
@@ -53,109 +51,24 @@ local CommonServices = {
 	"JointsService",
 	"KeyboardService",
 	"MouseService",
-	"NetworkClient",
-	"NetworkServer",
 	"NotificationService",
 	"PointsService",
-	"ScriptProfilerService",
-	"SolidModelService",
-	"SoundcardService",
 	"TestService",
 	"TouchInputService",
-	"TrackerService",
-	"TranslationRoactService",
-	"VideoCaptureService",
-	"VirtualInputManager",
 	"VirtualUser",
-	"Visit",
-	"XboxAppSupportService",
-	"ChangeHistoryService",
 	"CookiesService",
-	"CustomAvatarService",
-	"CustomOutfitDataStore",
-	"DataModelPatchService",
-	"DebrisService",
-	"DraftsService",
-	"FriendService",
-	"GamepadPointerService",
-	"GamePassService2",
-	"GeometryService",
-	"HeightmapImporterService",
-	"IncrementalPatchBuilder",
-	"IXPService",
-	"LodDataService",
-	"LuaWebService",
-	"MemStorageService",
-	"MeshContentProvider",
-	"MetaBreakpointContextManager",
-	"OpenCloudService",
-	"PathfindingSimulationService",
-	"PermissionsService",
-	"PlatformFriendsService",
-	"PlayerEmulatorService",
-	"PluginDebugService",
-	"PluginManagementService",
-	"ReplicatedRandomNumberGenerator",
-	"RewardsService",
-	"RoactService",
-	"RobloxReplicatedStorage",
-	"RtMessagingService",
-	"ScriptChangeService",
-	"ScriptCloneWatcher",
-	"ScriptDebugger",
-	"ScriptRuntime",
-	"SessionService",
-	"SharedTableRegistry",
-	"SoundcardCaptureService",
-	"SpeakerService",
-	"SpawnerService",
-	"StartPageService",
-	"StudioAssetService",
-	"StudioData",
-	"StudioDeviceEmulatorService",
-	"StudioSettings",
-	"StudioTheme",
-	"SurfaceSelection",
-	"TaskScheduler",
-	"TeamCreateService",
-	"TeleportService",
-	"TerrainDetailLibrary",
-	"TextBoxService",
-	"TextFilteringService",
-	"ThumbnailGeneration",
-	"TimerService",
-	"TouchTransmitter",
-	"TweenBase",
-	"TweenSequenceProvider",
-	"UGCValidationService",
-	"UnvalidatedAssetService",
-	"UserGameSettings",
-	"UserInputAggregatorService",
+	"PolicyService",
+	"AvatarEditorService",
 	"UserService",
-	"UserSettings",
+	"VoiceChatService",
+	"TextBoxService",
 	"VersionControlService",
-	"VirtualUserInputService",
-	"VoiceChatInternal",
-	"Workspace",
 }
 
-local Environment = (type(getgenv) == "function") and getgenv() or _G
-
-for _, ServiceName in ipairs(CommonServices) do
+for _, ServiceName in ipairs(ServiceList) do
 	local Success, ServiceObject = pcall(game.GetService, game, ServiceName)
-	if Success then
+	if Success and ServiceObject then
 		Environment[ServiceName] = ServiceObject
 	end
 end
-
-setmetatable(Environment, {
-	__index = function(Table, Key)
-		local Success, ServiceObject = pcall(game.GetService, game, Key)
-		if Success then
-			rawset(Table, Key, ServiceObject)
-			return ServiceObject
-		end
-		return nil
-	end
-})
 
