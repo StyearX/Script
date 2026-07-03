@@ -25,6 +25,7 @@ local ServiceList = {
 	"ContextActionService",
 	"GuiService",
 	"ContentProvider",
+	"CoreGui",
 	"Chat",
 	"TextChatService",
 	"BadgeService",
@@ -72,3 +73,9 @@ for _, ServiceName in ipairs(ServiceList) do
 	end
 end
 
+if Environment.Players then
+	if not Environment.Players.LocalPlayer then
+		Environment.Players.PlayerAdded:Wait()
+	end
+	Environment.LocalPlayer = Environment.Players.LocalPlayer
+end
