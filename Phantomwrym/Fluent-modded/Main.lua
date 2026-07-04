@@ -1,18 +1,3 @@
--- [[ Dumped at: 2026-07-04 00:12:08 ]] --
--- [[ Source: main ]] --
--- [[ Category: httpget ]] --
--- [[ Target URL: https://raw.githubusercontent.com/twinkilya0-jpg/PhantomWyrm-Hub-X/refs/heads/main/Scripts/Mobile/MobilePhantomWyrmHubEvadeOverhaul.lua ]] --
--- [[ Repository: twinkilya0-jpg/PhantomWyrm-Hub-X ]] --
--- [[ GitHub: https://github.com/twinkilya0-jpg/PhantomWyrm-Hub-X ]] --
---[[
-    Fluent Interface Suite
-    This script is not intended to be modified.
-    To view the source code, see the 'src' folder on GitHub!
-
-    Author: dawid
-    License: MIT
-    GitHub: https://github.com/dawid-scripts/Fluent
---]]
 local a, b = {
     {
         1,
@@ -116,7 +101,7 @@ local a, b = {
     }
 }
 
-local Animation = loadstring(game:HttpGet("https://raw.githubusercontent.com/inuaposzoawjsjs-glitch/.githubasset/refs/heads/master/MODDEDFLUENT/AnimationGui.lua"))()
+local Animation = loadstring(game:HttpGet("https://raw.githubusercontent.com/StyearX/Script/refs/heads/main/Phantomwrym/Fluent-modded/AnimatedUi.lua"))()
 getgenv().ShineEnabled = true
 getgenv().ButtonGradients = {
     Background = ColorSequence.new {
