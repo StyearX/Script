@@ -1,9 +1,3 @@
--- [[ Dumped at: 2026-07-04 00:12:08 ]] --
--- [[ Source: FloatingButton.Lua ]] --
--- [[ Category: httpget ]] --
--- [[ Target URL: https://raw.githubusercontent.com/twinkilya0-jpg/PhantomWyrm-Hub-X/refs/heads/main/Scripts/Mobile/MobilePhantomWyrmHubEvadeOverhaul.lua ]] --
--- [[ Repository: twinkilya0-jpg/PhantomWyrm-Hub-X ]] --
--- [[ GitHub: https://github.com/twinkilya0-jpg/PhantomWyrm-Hub-X ]] --
 local httpService = game:GetService("HttpService")
 
 local FloatingButtonManager = {}
