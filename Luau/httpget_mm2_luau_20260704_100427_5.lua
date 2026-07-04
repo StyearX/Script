@@ -1,4 +1,4 @@
--- [[ Dumped at: 2026-07-04 10:04:27 ]] --
+
 -- [[ Source: mm2.luau ]] --
 -- [[ Category: httpget ]] --
 -- This file was protected using Luraph Obfuscator v14.7 [https://lura.ph/]
