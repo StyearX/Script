@@ -6,7 +6,7 @@ local serviceNames = {
     "GamepadService", "VirtualInputManager", "TweenService", "RunService",
     "PhysicsService", "Debris", "CollectionService", "PathfindingService",
     "HttpService", "MarketplaceService", "DataStoreService", "MemoryStoreService",
-    "MessagingService", "TeleportService", "FriendsService", "GroupService",
+    "MessagingService", "TeleportService", "GroupService",
     "GamePassService", "BadgeService", "SocialService", "Chat",
     "TextChatService", "TextService", "Lighting", "SoundService",
     "MaterialService", "RenderSettings", "AssetService", "AvatarEditorService",
