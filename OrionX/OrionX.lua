@@ -64,33 +64,13 @@ local OrionLib = {
 
 local Icons = {}
 
-local Icons = {}
-
-local Success, Response = pcall(function()
-    local rawData = game:HttpGetAsync("https://raw.githubusercontent.com/StyearX/Script/refs/heads/main/OrionX/asset.json")
-    local decoded = HttpService:JSONDecode(rawData)
-    if decoded and decoded.icons then
-        Icons = decoded.icons
-    else
-        error("Invalid JSON structure: 'icons' key not found")
-    end
-end)
-
-if not Success then
-    warn(string.format("\nOrion Library - Failed to load Feather Icons. Error: %s\n", tostring(Response)))
-    Icons = {}
-end
-
-local function GetIcon(IconName)
-    return Icons[IconName] -- Returns nil if not found
-end
-
 local IconPackSources = {
 	lucide    = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/lucide/dist/Icons.lua",
 	gravity   = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/gravity/dist/Icons.lua",
 	solar     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/solar/dist/Icons.lua",
 	sfsymbols = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/sfsymbols/dist/Icons.lua",
 	craft     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/craft/dist/Icons.lua",
+	feather   = "https://raw.githubusercontent.com/7kayoh/feather-roblox/refs/heads/main/src/Modules/asset.lua",
 }
 local IconPackCache = {}
 
