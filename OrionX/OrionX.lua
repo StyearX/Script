@@ -64,21 +64,26 @@ local OrionLib = {
 
 local Icons = {}
 
+local Icons = {}
+
 local Success, Response = pcall(function()
-	Icons = HttpService:JSONDecode(game:HttpGetAsync("https://raw.githubusercontent.com/StyearX/Script/refs/heads/main/OrionX/asset.json")).icons
+    local rawData = game:HttpGetAsync("https://raw.githubusercontent.com/StyearX/Script/refs/heads/main/OrionX/asset.json")
+    local decoded = HttpService:JSONDecode(rawData)
+    if decoded and decoded.icons then
+        Icons = decoded.icons
+    else
+        error("Invalid JSON structure: 'icons' key not found")
+    end
 end)
 
 if not Success then
-	warn("\nOrion Library - Failed to load Feather Icons. Error code: " .. Response .. "\n")
-end	
+    warn(string.format("\nOrion Library - Failed to load Feather Icons. Error: %s\n", tostring(Response)))
+    Icons = {}
+end
 
 local function GetIcon(IconName)
-	if Icons[IconName] ~= nil then
-		return Icons[IconName]
-	else
-		return nil
-	end
-end   
+    return Icons[IconName] -- Returns nil if not found
+end
 
 local IconPackSources = {
 	lucide    = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/lucide/dist/Icons.lua",
