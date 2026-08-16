@@ -23,55 +23,30 @@ local Options = {};
 getgenv().Toggles = Toggles;
 getgenv().Options = Options;
 
-local IconSourceURLs = {
-    lucide    = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/lucide/dist/Icons.lua",
-    gravity   = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/gravity/dist/Icons.lua",
-    solar     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/solar/dist/Icons.lua",
-    sfsymbols = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/sfsymbols/dist/Icons.lua",
-    craft     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/craft/dist/Icons.lua",
-    geist     = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/geist/dist/Icons.lua",
-    hero      = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/hero/dist/Icons.lua",
-    gmi       = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/GoogleMaterialIcons/dist/Icons.lua",
-}
-
-local IconCache = {}
+local IconSources = {}
 local Icons = {}
 
-local function LoadIconSource(prefix)
-    if IconCache[prefix] then return IconCache[prefix] end
-    local url = IconSourceURLs[prefix]
-    if not url then return nil end
-    local ok, result = pcall(function()
-        return loadstring(game:HttpGet(url, true))()
-    end)
-    if not ok then
-        warn("[Icons] Failed to load '" .. prefix .. "': " .. tostring(result))
-        return nil
-    end
-    if result and result.Icons then
-        IconCache[prefix] = { _sprites = result.Spritesheets, _icons = result.Icons }
-    else
-        IconCache[prefix] = result
-    end
-    return IconCache[prefix]
+function Icons.SetSource(name, tbl)
+    IconSources[name] = tbl
 end
 
 function Icons.GetIcon(key)
     if key == nil or key == "" then return nil end
     local prefix, name = key:match("^(.-)%/(.+)$")
     if prefix then
-        local source = LoadIconSource(prefix)
+        local source = IconSources[prefix]
         if not source then return nil end
-        if source._icons then
-            local entry = source._icons[name]
-            if not entry then return nil end
-            local sheetId = source._sprites[tostring(entry.Image)]
-            return { Image = sheetId, ImageRectOffset = entry.ImageRectPosition, ImageRectSize = entry.ImageRectSize }
-        else
-            return source[name]
+        local entry = source[name]
+        if not entry then return nil end
+        if type(entry) == "string" then
+            return entry
         end
+        if entry.Image then
+            return { Image = entry.Image, ImageRectOffset = entry.ImageRectPosition, ImageRectSize = entry.ImageRectSize }
+        end
+        return nil
     else
-        local lucide = LoadIconSource("lucide")
+        local lucide = IconSources["lucide"]
         if lucide then
             if lucide[key] then return lucide[key] end
             if lucide["lucide-" .. key] then return lucide["lucide-" .. key] end
@@ -82,13 +57,17 @@ end
 
 local function ApplyIcon(label, iconKey)
     if not label or not iconKey or iconKey == "" then return end
-    task.spawn(function()
-        local data = Icons.GetIcon(iconKey)
-        if not data then return end
+    local data = Icons.GetIcon(iconKey)
+    if not data then return end
+    if type(data) == "string" then
+        label.Image = data
+        label.ImageRectOffset = Vector2.zero
+        label.ImageRectSize = Vector2.zero
+    elseif type(data) == "table" then
         if data.Image then label.Image = data.Image end
         if data.ImageRectOffset then label.ImageRectOffset = data.ImageRectOffset end
         if data.ImageRectSize then label.ImageRectSize = data.ImageRectSize end
-    end)
+    end
 end
 
 local function IsClick(input)
@@ -252,29 +231,39 @@ end;
 function Library:MakeDraggable(Instance, Cutoff)
     Instance.Active = true;
 
-    local function StartDrag(startX, startY)
-        local ObjPos = Vector2.new(
-            startX - Instance.AbsolutePosition.X,
-            startY - Instance.AbsolutePosition.Y
-        );
+    local Dragging = false;
+    local DragOffset = Vector2.zero;
 
-        if ObjPos.Y > (Cutoff or 40) then return end;
+    local function StartDrag(inputPos)
+        local absPos = Instance.AbsolutePosition;
+        local relY = inputPos.Y - absPos.Y;
+
+        if relY < 0 or relY > (Cutoff or 40) then return end;
+        if Dragging then return end;
+
+        Dragging = true;
+        DragOffset = Vector2.new(
+            inputPos.X - absPos.X - (Instance.AbsoluteSize.X * Instance.AnchorPoint.X),
+            inputPos.Y - absPos.Y - (Instance.AbsoluteSize.Y * Instance.AnchorPoint.Y)
+        );
 
         while IsHeld() do
             local pos = InputService:GetMouseLocation();
-            Instance.Position = UDim2.new(
-                0, pos.X - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
-                0, pos.Y - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
+            Instance.Position = UDim2.fromOffset(
+                pos.X - DragOffset.X,
+                pos.Y - DragOffset.Y
             );
             RenderStepped:Wait();
         end;
+
+        Dragging = false;
     end
 
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            StartDrag(Mouse.X, Mouse.Y);
+            StartDrag(InputService:GetMouseLocation());
         elseif Input.UserInputType == Enum.UserInputType.Touch then
-            StartDrag(Input.Position.X, Input.Position.Y);
+            StartDrag(Vector2.new(Input.Position.X, Input.Position.Y));
         end;
     end)
 end;
@@ -2812,27 +2801,29 @@ function Library:CreateWindow(...)
     });
     Library:AddToRegistry(WindowLabel, { TextColor3 = 'FontColor' });
 
+    local ICON_CHEVRON_DOWN  = "rbxassetid://134243273101015"
+    local ICON_CHEVRON_RIGHT = "rbxassetid://92473583511724"
+    local ICON_X             = "rbxassetid://110786993356448"
+
     local MinimizeBtn = Library:Create('ImageButton', {
         BackgroundTransparency = 1;
         Position = UDim2.new(1, -66, 0, 10);
         Size = UDim2.fromOffset(20, 20);
-        Image = '';
+        Image = ICON_CHEVRON_DOWN;
         ImageColor3 = Color3.fromRGB(180, 180, 180);
         ZIndex = 10;
         Parent = Outer;
     });
-    ApplyIcon(MinimizeBtn, 'lucide/chevron-down');
 
     local CloseBtn = Library:Create('ImageButton', {
         BackgroundTransparency = 1;
         Position = UDim2.new(1, -38, 0, 10);
         Size = UDim2.fromOffset(20, 20);
-        Image = '';
+        Image = ICON_X;
         ImageColor3 = Color3.fromRGB(180, 180, 180);
         ZIndex = 10;
         Parent = Outer;
     });
-    ApplyIcon(CloseBtn, 'lucide/x');
 
     for _, btn in ipairs({ MinimizeBtn, CloseBtn }) do
         btn.MouseEnter:Connect(function() btn.ImageColor3 = Library.AccentColor end);
@@ -2846,7 +2837,7 @@ function Library:CreateWindow(...)
         IsMinimized = state;
         local target = state and UDim2.fromOffset(WindowFullSize.X.Offset, 40) or WindowFullSize;
         TweenService:Create(Outer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = target }):Play();
-        ApplyIcon(MinimizeBtn, state and 'lucide/chevron-right' or 'lucide/chevron-down');
+        MinimizeBtn.Image = state and ICON_CHEVRON_RIGHT or ICON_CHEVRON_DOWN;
         LeftPanel.Visible = not state;
         TabContainer.Visible = not state;
     end
@@ -3967,6 +3958,7 @@ end
 
 Library.SaveManager = SaveManager
 Library.ThemeManager = ThemeManager
+Library.Icons = Icons
 SaveManager:SetLibrary(Library)
 ThemeManager:SetLibrary(Library)
 getgenv().SaveManager = SaveManager
