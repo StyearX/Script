@@ -1328,6 +1328,10 @@ local BaseGroupbox = {};
 do
 
     local Funcs = {};
+
+    Funcs.AddColorPicker = function(self, Idx, Info)
+        return BaseAddons.__index.AddColorPicker(self, Idx, Info)
+    end
     function Funcs:AddBlank(Size)
 
         local Groupbox = self;
@@ -2757,8 +2761,32 @@ function Library:CreateWindow(...)
         end)
     end
 
+    local MinHoldStart = nil
+    local MinHoldActive = false
+
+    MinimizeBtn.InputBegan:Connect(function(Input)
+        if not IsClick(Input) then return end
+        MinHoldStart = tick()
+        MinHoldActive = true
+        task.spawn(function()
+            while MinHoldActive do
+                if tick() - MinHoldStart >= 10 then
+                    MinHoldActive = false
+                    ShowMinimizePicker()
+                    return
+                end
+                task.wait(0.05)
+            end
+        end)
+    end)
+
     MinimizeBtn.InputEnded:Connect(function(Input)
-        if IsClick(Input) then ShowMinimizePicker() end
+        if not IsClick(Input) then return end
+        if not MinHoldActive then return end
+        MinHoldActive = false
+        if tick() - MinHoldStart < 10 then
+            DoMinimize(not IsMinimized)
+        end
     end)
 
     local function ShowCloseDialog()
@@ -2814,9 +2842,7 @@ function Library:CreateWindow(...)
     end)
 
     local DragTouchRef = nil
-    local DragTouchActive = false
-    local DragOffset = Vector2.zero
-    local DragOuter = Outer
+    local DragActive = false
 
     local TitleBar = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -2826,33 +2852,43 @@ function Library:CreateWindow(...)
         Parent = Outer;
     })
 
-    local function StartWindowDrag(startPos)
-        DragOffset = Vector2.new(
-            startPos.X - DragOuter.AbsolutePosition.X,
-            startPos.Y - DragOuter.AbsolutePosition.Y
-        )
-        while IsHeld() or DragTouchActive do
-            local pos = (DragTouchRef and ActiveTouches[DragTouchRef]) or GetCursorPos()
-            if not pos then break end
-            DragOuter.Position = UDim2.fromOffset(pos.X - DragOffset.X, pos.Y - DragOffset.Y)
-            RenderStepped:Wait()
-        end
-        DragTouchRef = nil
-        DragTouchActive = false
-    end
-
     TitleBar.InputBegan:Connect(function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            task.spawn(StartWindowDrag, InputService:GetMouseLocation())
-        elseif Input.UserInputType == Enum.UserInputType.Touch then
-            DragTouchRef = Input
-            DragTouchActive = true
-            task.spawn(StartWindowDrag, Vector2.new(Input.Position.X, Input.Position.Y))
-        end
+        if DragActive then return end
+        local isTouch = Input.UserInputType == Enum.UserInputType.Touch
+        local isMouse = Input.UserInputType == Enum.UserInputType.MouseButton1
+        if not isTouch and not isMouse then return end
+
+        local startPos = isTouch
+            and Vector2.new(Input.Position.X, Input.Position.Y)
+            or InputService:GetMouseLocation()
+
+        local offsetX = startPos.X - Outer.AbsolutePosition.X
+        local offsetY = startPos.Y - Outer.AbsolutePosition.Y
+
+        DragActive = true
+        if isTouch then DragTouchRef = Input end
+
+        task.spawn(function()
+            while DragActive do
+                local pos
+                if isTouch then
+                    pos = ActiveTouches[DragTouchRef]
+                    if not pos then break end
+                else
+                    if not InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then break end
+                    pos = InputService:GetMouseLocation()
+                end
+                Outer.Position = UDim2.fromOffset(pos.X - offsetX, pos.Y - offsetY)
+                RenderStepped:Wait()
+            end
+            DragActive = false
+            DragTouchRef = nil
+        end)
     end)
+
     TitleBar.InputEnded:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.Touch and Input == DragTouchRef then
-            DragTouchActive = false
+            DragActive = false
         end
     end)
 
