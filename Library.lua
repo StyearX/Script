@@ -1626,6 +1626,7 @@ function Funcs:AddInput(Idx, Info)
             TextSize = 13;
             TextStrokeTransparency = 1;
             TextXAlignment = Enum.TextXAlignment.Left;
+            ClearTextOnFocus = false;
             ZIndex = 7;
             Parent = ContainerBox;
         });
@@ -1649,15 +1650,16 @@ function Funcs:AddInput(Idx, Info)
 
         if Textbox.Finished then
             Box.FocusLost:Connect(function(enter)
-                if not enter then return end
-                Textbox:SetValue(Box.Text);
-                Library:AttemptSave();
+                if enter or (Box.Text ~= '' and Box.Text ~= (Info.Default or '')) then
+                    Textbox:SetValue(Box.Text)
+                    Library:AttemptSave()
+                end
             end)
         else
             Box:GetPropertyChangedSignal('Text'):Connect(function()
                 Textbox:SetValue(Box.Text);
-                Library:AttemptSave();
-            end);
+                Library:AttemptSave()
+            end)
         end
 
         local function Update()
@@ -2215,37 +2217,67 @@ function Funcs:AddDropdown(Idx, Info)
         end;
 
         local DropdownJustOpened = false
+        local DropdownDragging = false
+        local DropdownDragStart = nil
+        local DRAG_THRESHOLD = 8
+
         DropdownInteract.InputBegan:Connect(function(Input)
-            if IsClick(Input) and not Library:MouseIsOverOpenedFrame() then
-                local opening = not ListOuter.Visible
-                ListOuter.Visible = opening
-                DropdownArrow.Text = opening and '^' or 'v'
-                if opening then
-                    DropdownJustOpened = true
-                    task.delay(0.15, function() DropdownJustOpened = false end)
-                    ListOuter.Position = UDim2.fromOffset(DropdownOuter.AbsolutePosition.X, DropdownOuter.AbsolutePosition.Y + DropdownOuter.AbsoluteSize.Y + 2)
-                    Dropdown:BuildDropdownList()
-                    Library.OpenedFrames[ListOuter] = true
-                else
-                    Library.OpenedFrames[ListOuter] = nil
+            if not IsClick(Input) then return end
+            DropdownDragging = false
+            DropdownDragStart = Vector2.new(Input.Position.X, Input.Position.Y)
+        end)
+
+        DropdownInteract.InputChanged:Connect(function(Input)
+            if not IsClick(Input) then return end
+            if DropdownDragStart then
+                local delta = Vector2.new(Input.Position.X, Input.Position.Y) - DropdownDragStart
+                if delta.Magnitude > DRAG_THRESHOLD then
+                    DropdownDragging = true
                 end
             end
         end)
+
+        DropdownInteract.InputEnded:Connect(function(Input)
+            if not IsClick(Input) then return end
+            if DropdownDragging then
+                DropdownDragging = false
+                DropdownDragStart = nil
+                return
+            end
+            DropdownDragStart = nil
+            if Library:MouseIsOverOpenedFrame() then return end
+            local opening = not ListOuter.Visible
+            ListOuter.Visible = opening
+            DropdownArrow.Text = opening and '^' or 'v'
+            if opening then
+                DropdownJustOpened = true
+                task.delay(0.2, function() DropdownJustOpened = false end)
+                ListOuter.Position = UDim2.fromOffset(
+                    DropdownOuter.AbsolutePosition.X,
+                    DropdownOuter.AbsolutePosition.Y + DropdownOuter.AbsoluteSize.Y + 2
+                )
+                Dropdown:BuildDropdownList()
+                Library.OpenedFrames[ListOuter] = true
+            else
+                Library.OpenedFrames[ListOuter] = nil
+            end
+        end)
+
         Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
-            if IsClick(Input) then
-                if DropdownJustOpened then return end
-                if ListOuter.Visible then
-                    local pos = GetCursorPos()
-                    local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize
-                    if pos.X < AbsPos.X or pos.X > AbsPos.X + AbsSize.X or pos.Y < AbsPos.Y or pos.Y > AbsPos.Y + AbsSize.Y then
-                        local DPos, DSize = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
-                        if pos.X < DPos.X or pos.X > DPos.X + DSize.X or pos.Y < DPos.Y or pos.Y > DPos.Y + DSize.Y then
-                            ListOuter.Visible = false
-                            DropdownArrow.Text = 'v'
-                            Library.OpenedFrames[ListOuter] = nil
-                        end
-                    end
-                end
+            if not IsClick(Input) then return end
+            if DropdownJustOpened then return end
+            if not ListOuter.Visible then return end
+            local pos = GetCursorPos()
+            local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize
+            local inList = pos.X >= AbsPos.X and pos.X <= AbsPos.X + AbsSize.X
+                and pos.Y >= AbsPos.Y and pos.Y <= AbsPos.Y + AbsSize.Y
+            local DPos, DSize = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
+            local inDrop = pos.X >= DPos.X and pos.X <= DPos.X + DSize.X
+                and pos.Y >= DPos.Y and pos.Y <= DPos.Y + DSize.Y
+            if not inList and not inDrop then
+                ListOuter.Visible = false
+                DropdownArrow.Text = 'v'
+                Library.OpenedFrames[ListOuter] = nil
             end
         end))
         Dropdown:SetValues();
@@ -2891,7 +2923,7 @@ local LeftSide = Library:Create('ScrollingFrame', {
             end);
         end;
 
-function Tab:ShowTab()
+        function Tab:ShowTab()
             for _, Tab in next, Window.Tabs do Tab:HideTab() end;
             TabHighlight.Visible = true;
             TabButton.BackgroundTransparency = 1;
@@ -2986,7 +3018,7 @@ function Tab:ShowTab()
 
         function Tab:AddLeftGroupbox(Name) return Tab:AddGroupbox({ Side = 1; Name = Name; }); end;
         function Tab:AddRightGroupbox(Name) return Tab:AddGroupbox({ Side = 2; Name = Name; }); end;
-function Tab:AddTabbox(Info)
+        function Tab:AddTabbox(Info)
             local Tabbox = { Tabs = {} };
             local BoxOuter = Library:Create('Frame', {
                 BackgroundColor3 = Library.MainColor,
