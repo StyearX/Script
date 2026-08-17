@@ -2050,7 +2050,7 @@ function Funcs:AddDropdown(Idx, Info)
         });
         local DropdownInteract = Library:Create('TextButton', {
             BackgroundTransparency = 1;
-            Size = UDim2.new(1, 0, 1, 0);
+            Size = UDim2.new(1, 0, 0, 24);
             Text = '';
             ZIndex = 7;
             Parent = DropdownOuter;
@@ -2154,22 +2154,44 @@ function Funcs:AddDropdown(Idx, Info)
                     Parent = Button;
                 });
                 Library:AddToRegistry(Label, { TextColor3 = Active and 'AccentColor' or 'FontColor'; });
+                local BtnTouchId = nil
+                local BtnTouchStartY = nil
+                local BtnScrolled = false
                 Button.InputBegan:Connect(function(Input)
-                    if IsClick(Input) then
-                        if Info.Multi then
-                            Dropdown.Value[Value] = not Dropdown.Value[Value];
-                            Dropdown:SetValue(Dropdown.Value);
-                        else
-                            Dropdown.Value = Value;
-                            Dropdown:SetValue(Dropdown.Value);
-                            ListOuter.Visible = false;
-                            DropdownArrow.Text = 'v';
-                            Library.OpenedFrames[ListOuter] = nil;
-                        end;
-
-                        Library:AttemptSave();
-                    end;
-                end);
+                    if Input.UserInputType == Enum.UserInputType.Touch then
+                        BtnTouchId = Input
+                        BtnTouchStartY = Input.Position.Y
+                        BtnScrolled = false
+                    end
+                end)
+                Button.InputChanged:Connect(function(Input)
+                    if Input.UserInputType == Enum.UserInputType.Touch and Input == BtnTouchId then
+                        if BtnTouchStartY and math.abs(Input.Position.Y - BtnTouchStartY) > 8 then
+                            BtnScrolled = true
+                        end
+                    end
+                end)
+                Button.InputEnded:Connect(function(Input)
+                    local isTouch = Input.UserInputType == Enum.UserInputType.Touch
+                    local isMouse = Input.UserInputType == Enum.UserInputType.MouseButton1
+                    if isTouch and Input == BtnTouchId then
+                        BtnTouchId = nil
+                        if BtnScrolled then BtnScrolled = false return end
+                    elseif not isMouse then return end
+                    if isTouch and BtnScrolled then return end
+                    if Info.Multi then
+                        Dropdown.Value[Value] = not Dropdown.Value[Value]
+                        Dropdown:SetValue(Dropdown.Value)
+                    else
+                        Dropdown.Value = Value
+                        Dropdown:SetValue(Dropdown.Value)
+                        ListOuter.Visible = false
+                        DropdownArrow.Text = 'v'
+                        Library.OpenedFrames[ListOuter] = nil
+                        DropIsOpen = false
+                    end
+                    Library:AttemptSave()
+                end)
                 Count = Count + 1;
             end;
 
@@ -2370,6 +2392,18 @@ function Funcs:AddDropdown(Idx, Info)
     BaseGroupbox.__namecall = function(Table, Key, ...)
         return Funcs[Key](...);
     end;
+
+    function Funcs:AddLeftGroupbox(Name)
+        if self.AddGroupbox then return self:AddGroupbox({ Side = 1; Name = Name; }) end
+        local g = { Container = self.Container; TextLabel = self.TextLabel; }
+        setmetatable(g, BaseGroupbox); return g
+    end
+
+    function Funcs:AddRightGroupbox(Name)
+        if self.AddGroupbox then return self:AddGroupbox({ Side = 2; Name = Name; }) end
+        local g = { Container = self.Container; TextLabel = self.TextLabel; }
+        setmetatable(g, BaseGroupbox); return g
+    end
 end;
 
 do
@@ -2841,8 +2875,10 @@ function Library:CreateWindow(...)
         if IsClick(Input) then ShowCloseDialog() end
     end)
 
-    local DragTouchRef = nil
     local DragActive = false
+    local DragOffsetX = 0
+    local DragOffsetY = 0
+    local DragTouchInput = nil
 
     local TitleBar = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -2852,45 +2888,53 @@ function Library:CreateWindow(...)
         Parent = Outer;
     })
 
-    TitleBar.InputBegan:Connect(function(Input)
+    local function BeginDrag(inputPos, touchInput)
         if DragActive then return end
-        local isTouch = Input.UserInputType == Enum.UserInputType.Touch
-        local isMouse = Input.UserInputType == Enum.UserInputType.MouseButton1
-        if not isTouch and not isMouse then return end
-
-        local startPos = isTouch
-            and Vector2.new(Input.Position.X, Input.Position.Y)
-            or InputService:GetMouseLocation()
-
-        local offsetX = startPos.X - Outer.AbsolutePosition.X
-        local offsetY = startPos.Y - Outer.AbsolutePosition.Y
-
         DragActive = true
-        if isTouch then DragTouchRef = Input end
+        DragTouchInput = touchInput
+        local vp = workspace.CurrentCamera.ViewportSize
+        DragOffsetX = inputPos.X - Outer.AbsolutePosition.X
+        DragOffsetY = inputPos.Y - Outer.AbsolutePosition.Y
+    end
 
-        task.spawn(function()
-            while DragActive do
-                local pos
-                if isTouch then
-                    pos = ActiveTouches[DragTouchRef]
-                    if not pos then break end
-                else
-                    if not InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then break end
-                    pos = InputService:GetMouseLocation()
-                end
-                Outer.Position = UDim2.fromOffset(pos.X - offsetX, pos.Y - offsetY)
-                RenderStepped:Wait()
-            end
-            DragActive = false
-            DragTouchRef = nil
-        end)
-    end)
+    local function UpdateDrag(inputPos)
+        if not DragActive then return end
+        local vp = workspace.CurrentCamera.ViewportSize
+        Outer.Position = UDim2.fromOffset(
+            math.clamp(inputPos.X - DragOffsetX, 0, vp.X - Outer.AbsoluteSize.X),
+            math.clamp(inputPos.Y - DragOffsetY, 0, vp.Y - Outer.AbsoluteSize.Y)
+        )
+    end
 
-    TitleBar.InputEnded:Connect(function(Input)
-        if Input.UserInputType == Enum.UserInputType.Touch and Input == DragTouchRef then
-            DragActive = false
+    local function EndDrag(touchInput)
+        if touchInput and touchInput ~= DragTouchInput then return end
+        DragActive = false
+        DragTouchInput = nil
+    end
+
+    TitleBar.InputBegan:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            BeginDrag(InputService:GetMouseLocation(), nil)
+        elseif Input.UserInputType == Enum.UserInputType.Touch then
+            BeginDrag(Vector2.new(Input.Position.X, Input.Position.Y), Input)
         end
     end)
+
+    Library:GiveSignal(InputService.InputChanged:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseMovement then
+            UpdateDrag(InputService:GetMouseLocation())
+        elseif Input.UserInputType == Enum.UserInputType.Touch and Input == DragTouchInput then
+            UpdateDrag(Vector2.new(Input.Position.X, Input.Position.Y))
+        end
+    end))
+
+    Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            EndDrag(nil)
+        elseif Input.UserInputType == Enum.UserInputType.Touch then
+            EndDrag(Input)
+        end
+    end))
 
     local LeftPanel = Library:Create('Frame', {
         BackgroundTransparency = 1,
@@ -2934,6 +2978,53 @@ function Library:CreateWindow(...)
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
     end;
+
+    if Config.Footer then
+        local Footer = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor;
+            BorderSizePixel = 0;
+            AnchorPoint = Vector2.new(0, 1);
+            Position = UDim2.new(0, 151, 1, 0);
+            Size = UDim2.new(1, -151, 0, 22);
+            ZIndex = 2;
+            Parent = Outer;
+        });
+        Library:AddToRegistry(Footer, { BackgroundColor3 = 'MainColor' });
+        Library:Create('UICorner', { CornerRadius = UDim.new(0, 8), Parent = Footer });
+        Library:CreateLabel({
+            Size = UDim2.fromScale(1, 1);
+            TextSize = 11;
+            Text = Config.Footer;
+            TextColor3 = Color3.fromRGB(100, 100, 100);
+            ZIndex = 3;
+            Parent = Footer;
+        });
+    end
+
+    local FooterText = Config.Footer or ''
+    local Footer = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderSizePixel = 0;
+        AnchorPoint = Vector2.new(0, 1);
+        Position = UDim2.new(0, 151, 1, 0);
+        Size = UDim2.new(1, -151, 0, 22);
+        ZIndex = 2;
+        Parent = Outer;
+    })
+    Library:Create('UICorner', { CornerRadius = UDim.new(0, 6), Parent = Footer })
+    Library:AddToRegistry(Footer, { BackgroundColor3 = 'MainColor' })
+    local FooterLabel = Library:CreateLabel({
+        Size = UDim2.fromScale(1, 1);
+        TextSize = 11;
+        Text = FooterText;
+        TextColor3 = Color3.fromRGB(100, 100, 100);
+        ZIndex = 3;
+        Parent = Footer;
+    })
+    Library:RemoveFromRegistry(FooterLabel)
+    function Window:SetFooter(Text)
+        FooterLabel.Text = Text or ''
+    end
 
     function Window:AddTab(Name, IconID)
         local Tab = { Groupboxes = {}, Tabboxes = {} };
