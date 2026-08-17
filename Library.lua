@@ -2216,69 +2216,73 @@ function Funcs:AddDropdown(Idx, Info)
             Func(Dropdown.Value);
         end;
 
-        local DropdownJustOpened = false
-        local DropdownDragging = false
-        local DropdownDragStart = nil
-        local DRAG_THRESHOLD = 8
+        local DropIsOpen = false
+        local DropTouchId = nil
+        local DropTouchStartY = nil
+        local DropTouchScrolled = false
+        local SCROLL_THRESHOLD = 10
+
+        local function OpenDropdown()
+            DropIsOpen = true
+            ListOuter.Position = UDim2.fromOffset(
+                DropdownOuter.AbsolutePosition.X,
+                DropdownOuter.AbsolutePosition.Y + DropdownOuter.AbsoluteSize.Y + 2
+            )
+            Dropdown:BuildDropdownList()
+            ListOuter.Visible = true
+            DropdownArrow.Text = '^'
+            Library.OpenedFrames[ListOuter] = true
+        end
+
+        local function CloseDropdown()
+            DropIsOpen = false
+            ListOuter.Visible = false
+            DropdownArrow.Text = 'v'
+            Library.OpenedFrames[ListOuter] = nil
+        end
 
         DropdownInteract.InputBegan:Connect(function(Input)
-            if not IsClick(Input) then return end
-            DropdownDragging = false
-            DropdownDragStart = Vector2.new(Input.Position.X, Input.Position.Y)
+            if Input.UserInputType == Enum.UserInputType.Touch then
+                DropTouchId = Input
+                DropTouchStartY = Input.Position.Y
+                DropTouchScrolled = false
+            end
         end)
 
         DropdownInteract.InputChanged:Connect(function(Input)
-            if not IsClick(Input) then return end
-            if DropdownDragStart then
-                local delta = Vector2.new(Input.Position.X, Input.Position.Y) - DropdownDragStart
-                if delta.Magnitude > DRAG_THRESHOLD then
-                    DropdownDragging = true
+            if Input.UserInputType == Enum.UserInputType.Touch and Input == DropTouchId then
+                if DropTouchStartY and math.abs(Input.Position.Y - DropTouchStartY) > SCROLL_THRESHOLD then
+                    DropTouchScrolled = true
                 end
             end
         end)
 
         DropdownInteract.InputEnded:Connect(function(Input)
-            if not IsClick(Input) then return end
-            if DropdownDragging then
-                DropdownDragging = false
-                DropdownDragStart = nil
-                return
-            end
-            DropdownDragStart = nil
-            if Library:MouseIsOverOpenedFrame() then return end
-            local opening = not ListOuter.Visible
-            ListOuter.Visible = opening
-            DropdownArrow.Text = opening and '^' or 'v'
-            if opening then
-                DropdownJustOpened = true
-                task.delay(0.2, function() DropdownJustOpened = false end)
-                ListOuter.Position = UDim2.fromOffset(
-                    DropdownOuter.AbsolutePosition.X,
-                    DropdownOuter.AbsolutePosition.Y + DropdownOuter.AbsoluteSize.Y + 2
-                )
-                Dropdown:BuildDropdownList()
-                Library.OpenedFrames[ListOuter] = true
-            else
-                Library.OpenedFrames[ListOuter] = nil
+            if Input.UserInputType == Enum.UserInputType.Touch and Input == DropTouchId then
+                DropTouchId = nil
+                if DropTouchScrolled then DropTouchScrolled = false return end
+                if DropIsOpen then CloseDropdown() else OpenDropdown() end
+            elseif Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if DropIsOpen then CloseDropdown() else OpenDropdown() end
             end
         end)
 
-        Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
+        Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
+            if not DropIsOpen then return end
             if not IsClick(Input) then return end
-            if DropdownJustOpened then return end
-            if not ListOuter.Visible then return end
-            local pos = GetCursorPos()
-            local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize
-            local inList = pos.X >= AbsPos.X and pos.X <= AbsPos.X + AbsSize.X
-                and pos.Y >= AbsPos.Y and pos.Y <= AbsPos.Y + AbsSize.Y
-            local DPos, DSize = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
-            local inDrop = pos.X >= DPos.X and pos.X <= DPos.X + DSize.X
-                and pos.Y >= DPos.Y and pos.Y <= DPos.Y + DSize.Y
-            if not inList and not inDrop then
-                ListOuter.Visible = false
-                DropdownArrow.Text = 'v'
-                Library.OpenedFrames[ListOuter] = nil
-            end
+            task.defer(function()
+                if not DropIsOpen then return end
+                local pos = (Input.UserInputType == Enum.UserInputType.Touch)
+                    and Vector2.new(Input.Position.X, Input.Position.Y)
+                    or GetCursorPos()
+                local ap, as = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize
+                local dp, ds = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
+                local inList = pos.X >= ap.X and pos.X <= ap.X+as.X and pos.Y >= ap.Y and pos.Y <= ap.Y+as.Y
+                local inBtn  = pos.X >= dp.X and pos.X <= dp.X+ds.X and pos.Y >= dp.Y and pos.Y <= dp.Y+ds.Y
+                if not inList and not inBtn then
+                    CloseDropdown()
+                end
+            end)
         end))
         Dropdown:SetValues();
         Dropdown:Display();
@@ -2631,14 +2635,10 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
     Library:Create('UICorner', { CornerRadius = UDim.new(0, 8), Parent = Outer });
-    local DragHandle = Library:Create('Frame', {
-        BackgroundTransparency = 1;
-        Position = UDim2.new(0, 0, 0, 0);
-        Size = UDim2.new(1, -80, 0, 40);
-        ZIndex = 2;
-        Parent = Outer;
-    });
-    Library:MakeDraggable(DragHandle, 40);
+    Library:AddToRegistry(Outer, { BackgroundColor3 = 'BackgroundColor' });
+
+    local MinimizeMode = Config.MinimizeMode or 'titlebar'
+
     local WindowLabel = Library:CreateLabel({
         Position = UDim2.fromOffset(16, 0),
         Size = UDim2.new(1, -90, 0, 40),
@@ -2651,9 +2651,11 @@ function Library:CreateWindow(...)
         Parent = Outer;
     });
     Library:AddToRegistry(WindowLabel, { TextColor3 = 'FontColor' });
-    local ICON_CHEVRON_DOWN  = "rbxassetid://134243273101015"
-    local ICON_CHEVRON_RIGHT = "rbxassetid://92473583511724"
-    local ICON_X             = "rbxassetid://110786993356448"
+
+    local ICON_CHEVRON_DOWN  = 'rbxassetid://134243273101015'
+    local ICON_CHEVRON_RIGHT = 'rbxassetid://92473583511724'
+    local ICON_X             = 'rbxassetid://110786993356448'
+
     local MinimizeBtn = Library:Create('ImageButton', {
         BackgroundTransparency = 1;
         Position = UDim2.new(1, -66, 0, 10);
@@ -2673,103 +2675,186 @@ function Library:CreateWindow(...)
         Parent = Outer;
     });
     for _, btn in ipairs({ MinimizeBtn, CloseBtn }) do
-        btn.MouseEnter:Connect(function() btn.ImageColor3 = Library.AccentColor end);
-        btn.MouseLeave:Connect(function() btn.ImageColor3 = Color3.fromRGB(180, 180, 180) end);
+        btn.MouseEnter:Connect(function() btn.ImageColor3 = Library.AccentColor end)
+        btn.MouseLeave:Connect(function() btn.ImageColor3 = Color3.fromRGB(180, 180, 180) end)
     end
 
-    local IsMinimized = false;
-    local WindowFullSize = Config.Size;
-    local function SetMinimized(state)
-        if not LeftPanel or not TabContainer then return end;
+    local IsMinimized = false
+    local WindowFullSize = Config.Size
 
-        IsMinimized = state;
-        local target = state and UDim2.fromOffset(WindowFullSize.X.Offset, 40) or WindowFullSize;
-        TweenService:Create(Outer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = target }):Play();
-        MinimizeBtn.Image = state and ICON_CHEVRON_RIGHT or ICON_CHEVRON_DOWN;
-        LeftPanel.Visible = not state;
-        TabContainer.Visible = not state;
+    local function DoMinimize(state)
+        IsMinimized = state
+        if MinimizeMode == 'full' then
+            Outer.Visible = not state
+        else
+            local target = state and UDim2.fromOffset(WindowFullSize.X.Offset, 40) or WindowFullSize
+            TweenService:Create(Outer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = target }):Play()
+            task.delay(state and 0 or 0.25, function()
+                if LeftPanel then LeftPanel.Visible = not state end
+                if TabContainer then TabContainer.Visible = not state end
+            end)
+        end
+        MinimizeBtn.Image = state and ICON_CHEVRON_RIGHT or ICON_CHEVRON_DOWN
     end
+
+    function Window:Minimize() DoMinimize(not IsMinimized) end
+    function Library:Minimize() DoMinimize(not IsMinimized) end
+
+    local function ShowMinimizePicker()
+        local PickOuter = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, MinimizeBtn.AbsolutePosition.X - Outer.AbsolutePosition.X - 60, 0, 42);
+            Size = UDim2.fromOffset(160, 70);
+            ZIndex = 50;
+            Parent = Outer;
+        })
+        Library:Create('UICorner', { CornerRadius = UDim.new(0, 6), Parent = PickOuter })
+        Library:AddToRegistry(PickOuter, { BackgroundColor3 = 'MainColor' })
+        local UIStroke = Instance.new('UIStroke')
+        UIStroke.Color = Library.OutlineColor
+        UIStroke.Thickness = 1
+        UIStroke.Parent = PickOuter
+        Library:AddToRegistry(UIStroke, { Color = 'OutlineColor' })
+
+        local options = {
+            { label = 'Turn into Titlebar', mode = 'titlebar' },
+            { label = 'Fully Minimize',     mode = 'full' },
+        }
+        for i, opt in ipairs(options) do
+            local Row = Library:Create('TextButton', {
+                BackgroundTransparency = 1;
+                Position = UDim2.fromOffset(0, (i-1)*35);
+                Size = UDim2.new(1, 0, 0, 35);
+                Font = Library.Font;
+                Text = opt.label;
+                TextColor3 = MinimizeMode == opt.mode and Library.AccentColor or Library.FontColor;
+                TextSize = 13;
+                ZIndex = 51;
+                Parent = PickOuter;
+            })
+            Library:AddToRegistry(Row, { TextColor3 = MinimizeMode == opt.mode and 'AccentColor' or 'FontColor' })
+            Row.InputBegan:Connect(function(Input)
+                if IsClick(Input) then
+                    MinimizeMode = opt.mode
+                    PickOuter:Destroy()
+                    DoMinimize(not IsMinimized)
+                end
+            end)
+        end
+
+        local conn
+        conn = InputService.InputBegan:Connect(function(Input)
+            if IsClick(Input) then
+                local pos = GetCursorPos()
+                local ap = PickOuter.AbsolutePosition
+                local as = PickOuter.AbsoluteSize
+                if pos.X < ap.X or pos.X > ap.X + as.X or pos.Y < ap.Y or pos.Y > ap.Y + as.Y then
+                    PickOuter:Destroy()
+                    conn:Disconnect()
+                end
+            end
+        end)
+    end
+
+    MinimizeBtn.InputEnded:Connect(function(Input)
+        if IsClick(Input) then ShowMinimizePicker() end
+    end)
 
     local function ShowCloseDialog()
         local Overlay = Library:Create('Frame', {
-            BackgroundColor3 = Color3.new(0, 0, 0);
+            BackgroundColor3 = Color3.new(0,0,0);
             BackgroundTransparency = 0.5;
             BorderSizePixel = 0;
-            Size = UDim2.fromScale(1, 1);
+            Size = UDim2.fromScale(1,1);
             ZIndex = 500;
             Parent = ScreenGui;
-        });
+        })
         local Dialog = Library:Create('Frame', {
-            AnchorPoint = Vector2.new(0.5, 0.5);
+            AnchorPoint = Vector2.new(0.5,0.5);
             BackgroundColor3 = Library.MainColor;
             BorderSizePixel = 0;
-            Position = UDim2.fromScale(0.5, 0.5);
-            Size = UDim2.fromOffset(248, 110);
+            Position = UDim2.fromScale(0.5,0.5);
+            Size = UDim2.fromOffset(248,110);
             ZIndex = 501;
             Parent = ScreenGui;
-        });
-        Library:Create('UICorner', { CornerRadius = UDim.new(0, 8), Parent = Dialog });
-        Library:AddToRegistry(Dialog, { BackgroundColor3 = 'MainColor' });
+        })
+        Library:Create('UICorner', { CornerRadius = UDim.new(0,8), Parent = Dialog })
+        Library:AddToRegistry(Dialog, { BackgroundColor3 = 'MainColor' })
         local AccentBar = Library:Create('Frame', {
             BackgroundColor3 = Library.AccentColor;
             BorderSizePixel = 0;
-            Size = UDim2.new(1, 0, 0, 2);
+            Size = UDim2.new(1,0,0,2);
             ZIndex = 502;
             Parent = Dialog;
-        });
-        Library:Create('UICorner', { CornerRadius = UDim.new(0, 8), Parent = AccentBar });
-        Library:AddToRegistry(AccentBar, { BackgroundColor3 = 'AccentColor' });
-        Library:CreateLabel({
-            Position = UDim2.fromOffset(0, 14);
-            Size = UDim2.new(1, 0, 0, 20);
-            TextSize = 14;
-            Text = 'Close window?';
-            TextXAlignment = Enum.TextXAlignment.Center;
-            ZIndex = 503;
-            Parent = Dialog;
-        });
-        Library:CreateLabel({
-            Position = UDim2.fromOffset(0, 34);
-            Size = UDim2.new(1, 0, 0, 16);
-            TextSize = 12;
-            Text = 'This will hide the UI.';
-            TextColor3 = Color3.fromRGB(150, 150, 150);
-            TextXAlignment = Enum.TextXAlignment.Center;
-            ZIndex = 503;
-            Parent = Dialog;
-        });
+        })
+        Library:Create('UICorner', { CornerRadius = UDim.new(0,8), Parent = AccentBar })
+        Library:AddToRegistry(AccentBar, { BackgroundColor3 = 'AccentColor' })
+        Library:CreateLabel({ Position=UDim2.fromOffset(0,14); Size=UDim2.new(1,0,0,20); TextSize=14; Text='Close window?'; TextXAlignment=Enum.TextXAlignment.Center; ZIndex=503; Parent=Dialog; })
+        Library:CreateLabel({ Position=UDim2.fromOffset(0,34); Size=UDim2.new(1,0,0,16); TextSize=12; Text='This will hide the UI.'; TextColor3=Color3.fromRGB(150,150,150); TextXAlignment=Enum.TextXAlignment.Center; ZIndex=503; Parent=Dialog; })
         local function MakeDialogBtn(text, xPos, color, callback)
-
-            local Btn = Library:Create('Frame', {
-                BackgroundColor3 = color;
-                BorderSizePixel = 0;
-                Position = UDim2.fromOffset(xPos, 66);
-                Size = UDim2.fromOffset(108, 28);
-                ZIndex = 503;
-                Parent = Dialog;
-            });
-            Library:Create('UICorner', { CornerRadius = UDim.new(0, 6), Parent = Btn });
-            local Lbl = Library:CreateLabel({
-                Size = UDim2.fromScale(1, 1);
-                TextSize = 13;
-                Text = text;
-                ZIndex = 504;
-                Parent = Btn;
-            });
-            Library:RemoveFromRegistry(Lbl);
-            Lbl.TextColor3 = Color3.fromRGB(255, 255, 255);
+            local Btn = Library:Create('Frame', { BackgroundColor3=color; BorderSizePixel=0; Position=UDim2.fromOffset(xPos,66); Size=UDim2.fromOffset(108,28); ZIndex=503; Parent=Dialog; })
+            Library:Create('UICorner', { CornerRadius=UDim.new(0,6), Parent=Btn })
+            local Lbl = Library:CreateLabel({ Size=UDim2.fromScale(1,1); TextSize=13; Text=text; ZIndex=504; Parent=Btn; })
+            Library:RemoveFromRegistry(Lbl)
+            Lbl.TextColor3 = Color3.fromRGB(255,255,255)
             Btn.InputBegan:Connect(function(Input)
                 if IsClick(Input) then
-                    Overlay:Destroy();
-                    Dialog:Destroy();
-                    if callback then callback() end;
-                end;
-            end);
-        end;
-
-        MakeDialogBtn('Close window', 14, Library.AccentColor, function() task.spawn(Library.Toggle) end);
-        MakeDialogBtn('Decline', 130, Library.OutlineColor, nil);
+                    Overlay:Destroy(); Dialog:Destroy()
+                    if callback then callback() end
+                end
+            end)
+        end
+        MakeDialogBtn('Close window', 14, Library.AccentColor, function() task.spawn(Library.Toggle) end)
+        MakeDialogBtn('Decline', 130, Library.OutlineColor, nil)
     end
+
+    CloseBtn.InputEnded:Connect(function(Input)
+        if IsClick(Input) then ShowCloseDialog() end
+    end)
+
+    local DragTouchRef = nil
+    local DragTouchActive = false
+    local DragOffset = Vector2.zero
+    local DragOuter = Outer
+
+    local TitleBar = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        Position = UDim2.new(0, 0, 0, 0);
+        Size = UDim2.new(1, -90, 0, 40);
+        ZIndex = 5;
+        Parent = Outer;
+    })
+
+    local function StartWindowDrag(startPos)
+        DragOffset = Vector2.new(
+            startPos.X - DragOuter.AbsolutePosition.X,
+            startPos.Y - DragOuter.AbsolutePosition.Y
+        )
+        while IsHeld() or DragTouchActive do
+            local pos = (DragTouchRef and ActiveTouches[DragTouchRef]) or GetCursorPos()
+            if not pos then break end
+            DragOuter.Position = UDim2.fromOffset(pos.X - DragOffset.X, pos.Y - DragOffset.Y)
+            RenderStepped:Wait()
+        end
+        DragTouchRef = nil
+        DragTouchActive = false
+    end
+
+    TitleBar.InputBegan:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            task.spawn(StartWindowDrag, InputService:GetMouseLocation())
+        elseif Input.UserInputType == Enum.UserInputType.Touch then
+            DragTouchRef = Input
+            DragTouchActive = true
+            task.spawn(StartWindowDrag, Vector2.new(Input.Position.X, Input.Position.Y))
+        end
+    end)
+    TitleBar.InputEnded:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.Touch and Input == DragTouchRef then
+            DragTouchActive = false
+        end
+    end)
 
     local LeftPanel = Library:Create('Frame', {
         BackgroundTransparency = 1,
@@ -2810,20 +2895,13 @@ function Library:CreateWindow(...)
     });
     Library:Create('UICorner', { CornerRadius = UDim.new(0, 6), Parent = TabContainer });
     Library:AddToRegistry(TabContainer, { BackgroundColor3 = 'BackgroundColor' });
-    MinimizeBtn.InputBegan:Connect(function(Input)
-        if IsClick(Input) then SetMinimized(not IsMinimized) end;
-    end);
-    CloseBtn.InputBegan:Connect(function(Input)
-        if IsClick(Input) then ShowCloseDialog() end;
-    end);
     function Window:SetWindowTitle(Title)
-
         WindowLabel.Text = Title;
     end;
 
     function Window:AddTab(Name, IconID)
         local Tab = { Groupboxes = {}, Tabboxes = {} };
-local TabButton = Library:Create('Frame', {
+        local TabButton = Library:Create('Frame', {
             BackgroundTransparency = 1,
             BackgroundColor3 = Library.MainColor,
             BorderSizePixel = 0,
@@ -2833,7 +2911,7 @@ local TabButton = Library:Create('Frame', {
         });
         Library:Create('UICorner', { CornerRadius = UDim.new(0, 4), Parent = TabButton });
         Library:AddToRegistry(TabButton, { BackgroundColor3 = 'MainColor' });
-local TabHighlight = Library:Create('Frame', {
+        local TabHighlight = Library:Create('Frame', {
             BackgroundColor3 = Library.AccentColor,
             BorderSizePixel = 0,
             Position = UDim2.new(1, 10, 0.5, -8),
@@ -2881,7 +2959,7 @@ local TabHighlight = Library:Create('Frame', {
             ZIndex = 2;
             Parent = TabContainer;
         });
-local LeftSide = Library:Create('ScrollingFrame', {
+        local LeftSide = Library:Create('ScrollingFrame', {
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
             Position = UDim2.new(0, 4, 0, 4);
