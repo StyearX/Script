@@ -1,4 +1,4 @@
-local NotificationLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/lxte/projects/refs/heads/main/UI/NotificationLibrary/Source.luau"))()
+local NotificationLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/StyearX/Script/refs/heads/main/Luau/Source.luau"))()
 local NotificationHandler = NotificationLibrary:New({
 	BackgroundColor = Color3.fromRGB(68, 71, 0), -- background color of the notification
 	-- TitleColor = Color3.fromRGB(), -- title text color
