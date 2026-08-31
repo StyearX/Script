@@ -1,0 +1,4 @@
+[00:33:21.373] NavigationCompleted: Success=True, ErrorStatus=Unknown
+[00:33:24.068] REAL_DOM_PROBE: "{\"elementsCount\":776,\"appShellFound\":true,\"splashFound\":true}"
+[00:33:24.121] Dumped Real rendered DOM (277371 chars) to real_rendered_dom.html
+[00:33:44.735] NavigationCompleted: Success=True, ErrorStatus=Unknown
