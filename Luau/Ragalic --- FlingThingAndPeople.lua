@@ -1,3 +1,4 @@
+-- Ai shit duh
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
@@ -10,8 +11,8 @@ local Options = Library.Options
 local Toggles = Library.Toggles
 Library.ForceCheckbox = false
 local Window = Library:CreateWindow({
-	Title = "Ragalic client",
-	Footer = "Ragalic client",
+	Title = "Ragalic",
+	Footer = "Ragalic",
 	NotifySide = "Right",
 	ShowCustomCursor = true,
 })
