@@ -1,1 +1,177 @@
+local openshit = Instance.new("ScreenGui")
+openshit.Name = "openshit"
+openshit.Parent = LocalPlayer.PlayerGui
+openshit.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+openshit.ResetOnSpawn = false
 
+local mainopen = Instance.new("TextButton")
+mainopen.Name = "mainopen"
+mainopen.Parent = openshit
+mainopen.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+mainopen.BackgroundTransparency = 1
+mainopen.Position = UDim2.new(0.101969875, 0, 0.110441767, 0)
+mainopen.Size = UDim2.new(0, 64, 0, 42)
+mainopen.Text = ""
+mainopen.Visible = true
+
+local mainopens = Instance.new("UICorner")
+mainopens.Parent = mainopen
+
+local backgroundImage = Instance.new("ImageLabel")
+backgroundImage.Name = "RotatingBackground"
+backgroundImage.Parent = mainopen
+backgroundImage.Size = UDim2.new(1.8 + 0.1, 0, 1.8 + 0.1, 0)
+backgroundImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+backgroundImage.AnchorPoint = Vector2.new(0.5, 0.5)
+backgroundImage.BackgroundTransparency = 1
+backgroundImage.Image = "rbxassetid://115629468950993"
+backgroundImage.SizeConstraint = Enum.SizeConstraint.RelativeXX
+backgroundImage.ZIndex = 0
+
+local frontImage = Instance.new("ImageLabel")
+frontImage.Name = "StaticIcon"
+frontImage.Parent = mainopen
+frontImage.Size = UDim2.new(0.85, 0, 1, 0)
+frontImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+frontImage.AnchorPoint = Vector2.new(0.5, 0.5)
+frontImage.BackgroundTransparency = 1
+frontImage.Image = "rbxassetid://80277179956565"
+frontImage.ZIndex = 1
+frontImage.ScaleType = Enum.ScaleType.Stretch 
+
+local frontCorner = Instance.new("UICorner")
+frontCorner.CornerRadius = UDim.new(1, 0)
+frontCorner.Parent = frontImage
+
+local rotation = 0
+local speed = 90 
+local lastTime = tick()
+
+task.spawn(function()
+	while true do
+		local now = tick()
+		local delta = now - lastTime
+		lastTime = now
+		
+		rotation = (rotation + speed * delta) % 360
+		backgroundImage.Rotation = rotation
+
+		task.wait()
+	end
+end)
+
+local function MakeDraggable(topbarobject, object, locked)
+    local Dragging = false
+    local DragInput
+    local DragStart
+    local StartPosition
+
+    local Holding = false
+    local HoldTime = 1.0
+    local MoveCancelThreshold = 6
+    local HoldToken = 0
+
+    object:SetAttribute("Locked", locked or false)
+
+    local function Update(input)
+        if object:GetAttribute("Locked") then return end
+        local delta = input.Position - DragStart
+        object.Position = UDim2.new(
+            StartPosition.X.Scale,
+            StartPosition.X.Offset + delta.X,
+            StartPosition.Y.Scale,
+            StartPosition.Y.Offset + delta.Y
+        )
+    end
+
+    local function ToggleLock()
+        local newState = not object:GetAttribute("Locked")
+        object:SetAttribute("Locked", newState)
+
+        Fluent:Notify({
+            Title = newState and "Button Locked" or "Button Unlocked",
+            Content = newState and "This button is now locked in place." or "This button can now be moved.",
+            Duration = 2
+        })
+    end
+
+    topbarobject.InputBegan:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1
+        and input.UserInputType ~= Enum.UserInputType.Touch then
+            return
+        end
+
+        Dragging = not object:GetAttribute("Locked")
+        Holding = true
+        DragStart = input.Position
+        StartPosition = object.Position
+
+        HoldToken += 1
+        local token = HoldToken
+
+        task.delay(HoldTime, function()
+            if Holding and token == HoldToken then
+                ToggleLock()
+            end
+        end)
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                Dragging = false
+                Holding = false
+            end
+        end)
+    end)
+
+    topbarobject.InputChanged:Connect(function(input)
+        if not DragStart then return end
+
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            if (input.Position - DragStart).Magnitude > MoveCancelThreshold then
+                Holding = false
+            end
+            DragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == DragInput and Dragging then
+            Update(input)
+        end
+    end)
+end
+
+MakeDraggable(mainopen, mainopen, false)
+
+local function playSound(soundId)
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://" .. soundId
+    sound.Parent = game:GetService("SoundService")
+    sound:Play()
+    sound.Ended:Connect(function()
+        sound:Destroy()
+    end)
+end
+
+mainopen.MouseButton1Click:Connect(function()
+local sounds = { "7127123605", "137566474343039", "438666542", "257001341", "257000833", "7127123554", "131607746976396", "97325669841459", "109312518223078" }
+    playSound(sounds[math.random(#sounds)])
+    Window:Minimize()
+
+    local function smoothSpeed(target, duration)
+        local start = speed
+        local steps = 30
+        for i = 1, steps do
+            speed = start + (target - start) * (i / steps)
+            task.wait(duration / steps)
+        end
+        speed = target
+    end
+    
+    smoothSpeed(360, 0.4)
+    task.wait(0.5)
+    smoothSpeed(180, 0.4)
+    task.wait(0.3)
+    smoothSpeed(90, 0.4)
+end)
